@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BookOpen, CircleHelp, Eye, Footprints, RotateCcw, ShieldQuestion, Sparkles } from 'lucide-react';
+import { Bot, BookOpen, BrainCircuit, CircleHelp, Eye, Footprints, RotateCcw, ShieldQuestion, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -35,8 +35,10 @@ import {
   type Position,
   type Side,
 } from '@/lib/shadow-shogi';
+import { applyCpuAction, chooseCpuAction, type CpuLevel } from '@/lib/shadow-shogi-ai';
 
-type Phase = 'intro' | 'playing' | 'handoff' | 'finished';
+type Phase = 'intro' | 'playing' | 'handoff' | 'cpu-thinking' | 'finished';
+type GameMode = 'local' | 'cpu';
 type Selection = { kind: 'board'; from: Position } | { kind: 'hand'; name: HandPieceName } | null;
 type PromotionRequest = { from: Position; to: Position } | null;
 
@@ -49,6 +51,13 @@ declare global {
 }
 
 const PREVIEW_GAME = createInitialGame(seededRandom(20260926));
+const HUMAN_SIDE: Side = 2;
+const CPU_SIDE: Side = 1;
+const CPU_LEVELS: Array<{ level: CpuLevel; name: string; badge: string; description: string }> = [
+  { level: 1, name: '初級', badge: 'GREEDY', description: '取れる影があれば取る。なければ気まぐれ。' },
+  { level: 2, name: '中級', badge: 'READER', description: '見えた動きを読み、危険と前進を評価する。' },
+  { level: 3, name: '最強', badge: 'OMNISCIENT', description: '全配置を理解し、完全情報で先を読む。' },
+];
 
 function moveKey([row, column]: Position) {
   return `${row}-${column}`;
@@ -96,6 +105,9 @@ export function GameApp() {
   const [game, setGame] = useState<GameState | null>(null);
   const [viewer, setViewer] = useState<Side>(2);
   const [phase, setPhase] = useState<Phase>('intro');
+  const [gameMode, setGameMode] = useState<GameMode>('local');
+  const [cpuLevel, setCpuLevel] = useState<CpuLevel>(2);
+  const [cpuReport, setCpuReport] = useState<{ depth: number; nodes: number } | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
   const [guessTarget, setGuessTarget] = useState<Piece | null>(null);
   const [promotionRequest, setPromotionRequest] = useState<PromotionRequest>(null);
@@ -126,9 +138,23 @@ export function GameApp() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [game, phase]);
 
-  const startMatch = useCallback(() => {
+  const startLocalMatch = useCallback(() => {
     setGame(createInitialGame());
-    setViewer(2);
+    setViewer(HUMAN_SIDE);
+    setGameMode('local');
+    setCpuReport(null);
+    setSelection(null);
+    setGuessTarget(null);
+    setPromotionRequest(null);
+    setPhase('playing');
+  }, []);
+
+  const startCpuMatch = useCallback((level: CpuLevel) => {
+    setGame(createInitialGame());
+    setViewer(HUMAN_SIDE);
+    setGameMode('cpu');
+    setCpuLevel(level);
+    setCpuReport(null);
     setSelection(null);
     setGuessTarget(null);
     setPromotionRequest(null);
@@ -147,16 +173,55 @@ export function GameApp() {
       annotations: { readOnlyHint: false, untrustedContentHint: false },
       execute: (input: Record<string, unknown> = {}) => {
         if (Object.keys(input).length > 0) throw new Error('この操作には入力項目はありません');
-        startMatch();
+        startLocalMatch();
         return { status: 'started', turn: '先手', mode: 'local_two_player' };
       },
     }, { signal: lifecycle.signal })).catch(() => undefined);
+    void Promise.resolve(context.registerTool({
+      name: 'start_shadow_shogi_cpu_match',
+      title: '影将棋のCPU対局を始める',
+      description: '初級・中級・最強から選び、このブラウザだけでCPU対局を開始します。',
+      inputSchema: {
+        type: 'object',
+        properties: { level: { type: 'string', enum: ['easy', 'normal', 'hard'] } },
+        required: ['level'],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false, untrustedContentHint: false },
+      execute: (input: { level?: string } = {}) => {
+        const keys = Object.keys(input);
+        if (keys.length !== 1 || keys[0] !== 'level' || !['easy', 'normal', 'hard'].includes(input.level ?? '')) {
+          throw new Error('level は easy・normal・hard のいずれかで指定してください');
+        }
+        const level = input.level === 'easy' ? 1 : input.level === 'hard' ? 3 : 2;
+        startCpuMatch(level);
+        return { status: 'started', turn: '先手', mode: 'cpu', level: input.level };
+      },
+    }, { signal: lifecycle.signal })).catch(() => undefined);
     return () => lifecycle.abort();
-  }, [startMatch]);
+  }, [startCpuMatch, startLocalMatch]);
+
+  useEffect(() => {
+    if (gameMode !== 'cpu' || phase !== 'cpu-thinking' || !game || game.winner || game.turn !== CPU_SIDE) return;
+    const timer = window.setTimeout(() => {
+      const decision = chooseCpuAction(game, cpuLevel, CPU_SIDE);
+      setCpuReport({ depth: decision.depth, nodes: decision.nodes });
+      if (!decision.action) {
+        setPhase('playing');
+        return;
+      }
+      const next = applyCpuAction(game, decision.action);
+      setGame(next);
+      setPhase(next.winner ? 'finished' : 'playing');
+    }, cpuLevel === 3 ? 520 : 680);
+    return () => window.clearTimeout(timer);
+  }, [cpuLevel, game, gameMode, phase]);
 
   function resetToIntro() {
     setGame(null);
-    setViewer(2);
+    setViewer(HUMAN_SIDE);
+    setGameMode('local');
+    setCpuReport(null);
     setSelection(null);
     setGuessTarget(null);
     setPromotionRequest(null);
@@ -168,7 +233,14 @@ export function GameApp() {
     setSelection(null);
     setPromotionRequest(null);
     setGuessTarget(null);
-    setPhase(next.winner ? 'finished' : 'handoff');
+    if (next.winner) {
+      setPhase('finished');
+    } else if (gameMode === 'cpu') {
+      setViewer(HUMAN_SIDE);
+      setPhase(next.turn === CPU_SIDE ? 'cpu-thinking' : 'playing');
+    } else {
+      setPhase('handoff');
+    }
   }
 
   function commitBoardMove(from: Position, to: Position, promote: boolean) {
@@ -226,6 +298,9 @@ export function GameApp() {
   }
 
   const opponent = otherSide(viewer);
+  const cpuLevelInfo = CPU_LEVELS.find((item) => item.level === cpuLevel) ?? CPU_LEVELS[1];
+  const playerLabel = (side: Side) => gameMode === 'cpu' && side === CPU_SIDE ? 'CPU' : sideLabel(side);
+  const opponentLabel = gameMode === 'cpu' ? `CPU・${cpuLevelInfo.name}` : sideLabel(opponent);
   const selectedText = selection?.kind === 'board'
     ? `${shownGame.board[selection.from[0]][selection.from[1]]?.name ?? ''}を選択中`
     : selection?.kind === 'hand' ? `${selection.name}を打つ場所を選択中` : '自分の駒を選んでください';
@@ -253,7 +328,7 @@ export function GameApp() {
               <p className="section-label">MOVE LOG</p>
               {game.moveHistory.length === 0 ? <p className="empty-copy">まだ指し手はありません</p> : game.moveHistory.slice(-6).reverse().map((move, index) => (
                 <div className="history-row" key={`${move.pieceId}-${game.moveHistory.length - index}`}>
-                  <span>{game.moveHistory.length - index}</span><strong>{sideLabel(move.side)}</strong><span>{move.from ? `${boardCoordinates(move.from)} → ${boardCoordinates(move.to)}` : `${boardCoordinates(move.to)} 打`}</span>
+                  <span>{game.moveHistory.length - index}</span><strong>{playerLabel(move.side)}</strong><span>{move.from ? `${boardCoordinates(move.from)} → ${boardCoordinates(move.to)}` : `${boardCoordinates(move.to)} 打`}</span>
                 </div>
               ))}
             </div>
@@ -262,7 +337,7 @@ export function GameApp() {
 
         <section className="board-column" aria-label="影将棋の盤面">
           <div className="captured-zone opponent-zone">
-            <div className="zone-heading"><div><span className="mini-piece">影</span><p><strong>{sideLabel(opponent)}</strong><small>相手の持ち駒と取られた駒</small></p></div><span className="shadow-count">影 × {handTotal(shownGame.hands[opponent])}</span></div>
+            <div className="zone-heading"><div><span className="mini-piece">影</span><p><strong>{opponentLabel}</strong><small>相手の持ち駒と取られた駒</small></p></div><span className="shadow-count">影 × {handTotal(shownGame.hands[opponent])}</span></div>
             <div className="captured-list">
               {HAND_NAMES.filter((name) => shownGame.takenLogs[viewer][name] > 0).map((name) => <span className="captured-chip" key={name}>{name}<small>×{shownGame.takenLogs[viewer][name]}</small></span>)}
               {HAND_NAMES.every((name) => shownGame.takenLogs[viewer][name] === 0) ? <span className="empty-hand">まだ駒は取られていません</span> : null}
@@ -299,7 +374,7 @@ export function GameApp() {
           </div>
 
           <div className="captured-zone own-zone">
-            <div className="zone-heading"><div><span className="mini-piece gold">王</span><p><strong>{sideLabel(viewer)}・あなた</strong><small>{phase === 'playing' ? selectedText : '手番を待っています'}</small></p></div><span className="turn-pill">{phase === 'playing' ? '手番' : '待機'}</span></div>
+            <div className="zone-heading"><div><span className="mini-piece gold">王</span><p><strong>{sideLabel(viewer)}・あなた</strong><small>{phase === 'playing' ? selectedText : phase === 'cpu-thinking' ? 'CPUが次の一手を探索中' : '手番を待っています'}</small></p></div><span className="turn-pill">{phase === 'playing' ? '手番' : phase === 'cpu-thinking' ? '思考中' : '待機'}</span></div>
             <div className="hand-list" aria-label="持ち駒">
               {HAND_NAMES.map((name) => {
                 const count = shownGame.hands[viewer][name];
@@ -313,16 +388,28 @@ export function GameApp() {
         <aside className="side-panel control-panel">
           {phase === 'intro' ? (
             <>
-              <p className="section-label">LOCAL MATCH</p><h3>この画面で二人対局</h3>
-              <p>Swift版と同じく、毎手ごとに盤面を隠して端末を渡します。先手から開始します。</p>
-              <Button className="start-button" onClick={startMatch}><Sparkles /> ランダム盤面で始める</Button>
-              <dl className="setup-list"><div><dt>盤面</dt><dd>9 × 9</dd></div><div><dt>初期配置</dt><dd>Swift版準拠</dd></div><div><dt>勝利条件</dt><dd>王を取る</dd></div></dl>
+              <p className="section-label">SELECT MATCH</p><h3>対局方法を選ぶ</h3>
+              <p>一台での二人対局に加え、ブラウザだけで動く3段階のCPUと対局できます。</p>
+              <Button className="start-button" onClick={startLocalMatch}><Users /> 二人で対局する</Button>
+              <div className="cpu-picker-heading"><Bot /><span>CPUと対局</span></div>
+              <div className="cpu-level-grid">
+                {CPU_LEVELS.map((item) => (
+                  <button type="button" key={item.level} onClick={() => startCpuMatch(item.level)}>
+                    <span className="cpu-level-number">{item.level}</span>
+                    <span><strong>{item.name}</strong><small>{item.badge}</small></span>
+                    <em>{item.description}</em>
+                  </button>
+                ))}
+              </div>
+              <dl className="setup-list"><div><dt>盤面</dt><dd>9 × 9</dd></div><div><dt>初期配置</dt><dd>Swift版準拠</dd></div><div><dt>CPU処理</dt><dd>端末内で完結</dd></div></dl>
             </>
           ) : (
             <>
-              <p className="section-label">CURRENT TURN</p><h3>{sideLabel(game?.turn ?? viewer)}の手番</h3>
-              <p>自分の駒を選ぶと移動可能な升が光ります。相手の影を選ぶと予想を記録できます。</p>
+              <p className="section-label">{gameMode === 'cpu' ? `${cpuLevelInfo.badge} CPU` : 'CURRENT TURN'}</p><h3>{phase === 'cpu-thinking' ? 'CPUが思考中' : `${playerLabel(game?.turn ?? viewer)}の手番`}</h3>
+              <p>{phase === 'cpu-thinking' ? `${cpuLevelInfo.name}CPUが盤面を読んでいます。相手の駒はあなたには影のままです。` : '自分の駒を選ぶと移動可能な升が光ります。相手の影を選ぶと予想を記録できます。'}</p>
+              {phase === 'cpu-thinking' ? <div className="cpu-thinking"><BrainCircuit /><span /><span /><span /></div> : null}
               <div className="status-card"><span className="status-number">{(game?.moveHistory.length ?? 0) + 1}</span><div><strong>手目</strong><small>{selection ? selectedText : '盤面を観察中'}</small></div></div>
+              {gameMode === 'cpu' && cpuReport ? <p className="cpu-report">前回の探索：深さ {cpuReport.depth}・{cpuReport.nodes.toLocaleString()}局面</p> : null}
               <button type="button" className="tip-card" onClick={() => setRulesOpen(true)}><CircleHelp /><span><strong>ルールを確認</strong><small>成り・持ち駒・二歩について</small></span></button>
             </>
           )}
@@ -362,19 +449,20 @@ export function GameApp() {
 
       <Dialog open={phase === 'finished' && Boolean(game?.winner)} onOpenChange={() => undefined}>
         <DialogContent showCloseButton={false} className="result-dialog">
-          <span className="result-piece">王</span><DialogHeader><DialogTitle>{game?.winner ? `${sideLabel(game.winner)}の勝利` : ''}</DialogTitle><DialogDescription>相手の王を捕らえました。</DialogDescription></DialogHeader>
-          <DialogFooter><Button variant="outline" onClick={resetToIntro}>タイトルへ</Button><Button onClick={startMatch}>もう一局</Button></DialogFooter>
+          <span className="result-piece">王</span><DialogHeader><DialogTitle>{game?.winner ? `${gameMode === 'cpu' ? (game.winner === HUMAN_SIDE ? 'あなた' : 'CPU') : sideLabel(game.winner)}の勝利` : ''}</DialogTitle><DialogDescription>{gameMode === 'cpu' && game?.winner === CPU_SIDE ? 'あなたの王が影の中から見つかりました。' : '相手の王を捕らえました。'}</DialogDescription></DialogHeader>
+          <DialogFooter><Button variant="outline" onClick={resetToIntro}>タイトルへ</Button><Button onClick={() => gameMode === 'cpu' ? startCpuMatch(cpuLevel) : startLocalMatch()}>もう一局</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={rulesOpen} onOpenChange={setRulesOpen}>
         <DialogContent className="rules-dialog sm:max-w-lg">
-          <DialogHeader><DialogTitle>影将棋の遊び方</DialogTitle><DialogDescription>Swift版の二人対局ルールをWeb向けに移植しています。</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>影将棋の遊び方</DialogTitle><DialogDescription>Swift版のルールをWebへ移植し、端末内で動くCPU対局を追加しています。</DialogDescription></DialogHeader>
           <ol className="rules-list">
             <li><span>01</span><div><strong>配置は毎局ランダム</strong><p>各列に歩が1枚、王は最下段。その他の駒はSwift版と同じ手順で入れ替わります。</p></div></li>
             <li><span>02</span><div><strong>相手の駒は影</strong><p>影を押すと予想を記録できます。移動方向の履歴も予想画面で確認できます。</p></div></li>
             <li><span>03</span><div><strong>通常の移動・成り・持ち駒</strong><p>二歩と行き所のない駒打ちは禁止。王手・詰み・打ち歩詰めの判定はしません。</p></div></li>
             <li><span>04</span><div><strong>王を取れば勝ち</strong><p>王の位置は最後まで分かりません。実際に王を捕らえた瞬間に決着します。</p></div></li>
+            <li><span>05</span><div><strong>3段階のCPU</strong><p>初級は捕獲優先、中級は観察した動きを評価。最強はあなたの配置を含む完全情報で3手先まで探索します。</p></div></li>
           </ol>
           <DialogFooter><Button onClick={() => setRulesOpen(false)}>わかった</Button></DialogFooter>
         </DialogContent>

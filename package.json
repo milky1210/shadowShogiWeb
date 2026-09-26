@@ -9,8 +9,8 @@
     "dev": "vinext dev",
     "build": "vinext build",
     "start": "wrangler dev --config dist/server/wrangler.json",
-    "test": "node --experimental-strip-types --test lib/shadow-shogi.test.ts",
-    "lint": "oxlint app components/game-app.tsx components/ui/button.tsx components/ui/dialog.tsx lib/shadow-shogi.ts",
+    "test": "node --experimental-strip-types --test lib/shadow-shogi.test.ts lib/shadow-shogi-ai.test.ts",
+    "lint": "oxlint app components/game-app.tsx components/ui/button.tsx components/ui/dialog.tsx lib/shadow-shogi.ts lib/shadow-shogi-ai.ts",
     "format": "oxfmt"
   },
   "dependencies": {
