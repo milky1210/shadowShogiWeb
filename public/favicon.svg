@@ -1,0 +1,7 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="64" height="64" rx="14" fill="#071B25"/>
+  <path d="M14 51L18 13H46L50 51H14Z" fill="#D0A34F"/>
+  <path d="M18.5 47L21.5 17H42.5L45.5 47H18.5Z" fill="#E7C77E"/>
+  <path d="M32 18C24.5 23.5 23.5 33.5 32 45C40.5 33.5 39.5 23.5 32 18Z" fill="#0A2530" opacity="0.92"/>
+  <text x="32" y="39" text-anchor="middle" font-size="23" font-weight="700" font-family="serif" fill="#F4DFA7">影</text>
+</svg>

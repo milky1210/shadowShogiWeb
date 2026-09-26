@@ -1,0 +1,200 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+
+@custom-variant dark (&:is(.dark *));
+@theme inline {
+  --color-background: var(--background); --color-foreground: var(--foreground);
+  --color-card: var(--card); --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary); --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary); --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted); --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent); --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive); --color-border: var(--border);
+  --color-input: var(--input); --color-ring: var(--ring);
+  --color-popover: var(--popover); --color-popover-foreground: var(--popover-foreground);
+  --radius-sm: calc(var(--radius) * .65); --radius-md: calc(var(--radius) * .8);
+  --radius-lg: var(--radius); --radius-xl: calc(var(--radius) * 1.35);
+}
+:root, .dark {
+  --background: oklch(0.12 0.028 244); --foreground: oklch(0.93 0.018 85);
+  --card: oklch(0.17 0.032 245); --card-foreground: oklch(0.93 0.018 85);
+  --popover: oklch(0.17 0.032 245); --popover-foreground: oklch(0.93 0.018 85);
+  --primary: oklch(0.76 0.13 77); --primary-foreground: oklch(0.15 0.03 244);
+  --secondary: oklch(0.22 0.034 244); --secondary-foreground: oklch(0.88 0.02 85);
+  --muted: oklch(0.19 0.025 244); --muted-foreground: oklch(0.62 0.025 230);
+  --accent: oklch(0.25 0.044 210); --accent-foreground: oklch(0.92 0.02 90);
+  --destructive: oklch(0.64 0.19 28); --border: oklch(0.43 0.04 225 / 30%);
+  --input: oklch(0.43 0.04 225 / 38%); --ring: oklch(0.76 0.13 77); --radius: .5rem;
+}
+
+* { box-sizing: border-box; }
+html { min-width: 320px; background: #071018; }
+body { margin: 0; min-height: 100vh; background: #071018; color: #edf0e8; font-family: "Yu Gothic", "Hiragino Kaku Gothic ProN", system-ui, sans-serif; }
+button { font: inherit; }
+.game-page { min-height: 100vh; overflow-x: hidden; background: radial-gradient(circle at 50% 38%, rgba(42, 92, 98, .18), transparent 34%), radial-gradient(circle at 5% 85%, rgba(126, 80, 34, .08), transparent 26%), linear-gradient(135deg, #08121b, #060d14 54%, #09141c); }
+.topbar { width: min(1500px, calc(100% - 48px)); margin: 0 auto; min-height: 80px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; border-bottom: 1px solid rgba(135, 165, 170, .11); }
+.brand-lockup { display: flex; align-items: center; gap: 12px; }
+.brand-piece, .mini-piece, .handoff-piece, .result-piece { display: grid; place-items: center; color: #1b2427; background: linear-gradient(155deg, #d6ad65, #9c6e35); clip-path: polygon(50% 0, 94% 19%, 85% 100%, 15% 100%, 6% 19%); font-family: "Yu Mincho", "Hiragino Mincho ProN", serif; font-weight: 800; }
+.brand-piece { width: 38px; height: 42px; }
+.brand-lockup p, .brand-lockup h1 { margin: 0; }
+.brand-kicker { color: #c79d58; font-family: Georgia, serif; font-size: 9px; letter-spacing: .2em; }
+.brand-lockup h1 { margin-top: 3px; font-family: "Yu Mincho", "Hiragino Mincho ProN", serif; font-size: 18px; letter-spacing: .16em; }
+.tagline { margin: 0; color: #6f8288; font-family: "Yu Mincho", "Hiragino Mincho ProN", serif; font-size: 12px; letter-spacing: .16em; }
+.top-actions { justify-self: end; display: flex; gap: 6px; }
+.top-actions button { color: #aeb9b6; }
+.top-actions button:last-child { border-color: rgba(204, 167, 102, .2); background: rgba(207, 170, 102, .05); color: #c5b392; }
+
+.game-stage { width: min(1500px, calc(100% - 48px)); margin: 0 auto; display: grid; grid-template-columns: minmax(220px, 290px) minmax(520px, 650px) minmax(220px, 280px); justify-content: center; align-items: center; gap: clamp(26px, 3.5vw, 64px); padding: 23px 0 40px; }
+.side-panel { color: #879aa0; }
+.section-label { margin: 0 0 14px; color: #ad8650; font-size: 9px; font-weight: 800; letter-spacing: .23em; }
+.intro-panel h2 { margin: 0; color: #f0eee5; font-family: "Yu Mincho", "Hiragino Mincho ProN", serif; font-size: clamp(31px, 3vw, 45px); font-weight: 500; line-height: 1.35; letter-spacing: .05em; }
+.lead { margin: 18px 0 24px; font-size: 12px; line-height: 2; }
+.rule-card { display: flex; align-items: center; gap: 13px; margin-top: 9px; border: 1px solid rgba(119, 155, 158, .1); background: rgba(17, 36, 45, .52); padding: 12px; }
+.rule-card svg { width: 18px; color: #b28a51; }
+.rule-card strong, .rule-card span { display: block; }
+.rule-card strong { color: #bcc8c6; font-size: 11px; font-weight: 600; }
+.rule-card span { margin-top: 3px; color: #596f76; font-size: 9px; }
+.history-panel { margin-top: 28px; }
+.history-row { display: grid; grid-template-columns: 20px 38px 1fr; gap: 6px; border-top: 1px solid rgba(129, 154, 154, .09); padding: 8px 0; font-size: 9px; }
+.history-row > span:first-child { color: #52676d; }
+.history-row strong { color: #a99675; font-weight: 600; }
+.history-row > span:last-child { color: #75888c; text-align: right; }
+.empty-copy { color: #50666c; font-size: 10px; }
+
+.board-column { width: 100%; }
+.captured-zone { border: 1px solid rgba(121, 153, 157, .11); background: rgba(11, 26, 35, .56); padding: 9px 11px; }
+.opponent-zone { margin-bottom: 10px; }
+.own-zone { margin-top: 10px; }
+.zone-heading { display: flex; align-items: center; justify-content: space-between; min-height: 35px; }
+.zone-heading > div { display: flex; align-items: center; gap: 9px; }
+.mini-piece { width: 29px; height: 32px; background: linear-gradient(155deg, #42515a, #222e35); color: #879399; font-size: 11px; }
+.mini-piece.gold { background: linear-gradient(155deg, #d4ad67, #9b713d); color: #1c272b; }
+.zone-heading p { margin: 0; }
+.zone-heading strong, .zone-heading small { display: block; }
+.zone-heading strong { color: #c7d0cd; font-size: 10px; }
+.zone-heading small { margin-top: 2px; color: #53676e; font-size: 8px; }
+.shadow-count, .turn-pill { border: 1px solid rgba(112, 143, 150, .14); background: rgba(87, 111, 118, .06); padding: 5px 8px; color: #7c8e92; font-size: 9px; letter-spacing: .06em; }
+.turn-pill { border-color: rgba(207, 164, 92, .24); background: rgba(207, 164, 92, .07); color: #c59b59; }
+.captured-list, .hand-list { min-height: 36px; display: flex; align-items: center; gap: 5px; margin-top: 7px; overflow-x: auto; scrollbar-width: thin; }
+.captured-chip { min-width: 34px; height: 31px; display: inline-grid; grid-template-columns: 1fr auto; place-items: center; gap: 2px; border: 1px solid rgba(143, 165, 164, .12); background: rgba(45, 60, 65, .32); color: #9aa8a7; font-family: "Yu Mincho", serif; font-size: 13px; }
+.captured-chip small { font-family: system-ui, sans-serif; font-size: 7px; }
+.empty-hand { color: #435960; font-size: 8px; }
+.hand-list { justify-content: flex-start; }
+.hand-piece { position: relative; min-width: 46px; height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 3px; border: 1px solid rgba(204, 170, 107, .15); background: rgba(176, 128, 62, .05); color: #8f7957; cursor: pointer; transition: .16s ease; }
+.hand-piece span { font-family: "Yu Mincho", serif; font-size: 16px; }
+.hand-piece small { font-size: 8px; }
+.hand-piece:disabled { opacity: .26; cursor: default; }
+.hand-piece:not(:disabled):hover, .hand-piece.active { border-color: #c59b59; background: rgba(197, 155, 89, .15); color: #e2c991; box-shadow: inset 0 0 14px rgba(197, 155, 89, .12); }
+
+.board-frame { position: relative; border: 9px solid #182b32; box-shadow: 0 24px 80px rgba(0, 0, 0, .45), 0 0 0 1px #31505a, inset 0 0 20px rgba(0, 0, 0, .7); }
+.board-grid { display: grid; grid-template-columns: repeat(9, 1fr); aspect-ratio: 1; background: #355052; }
+.file-labels { position: absolute; z-index: 4; left: 0; right: 0; top: -22px; display: grid; grid-template-columns: repeat(9, 1fr); color: #496168; font-family: ui-monospace, monospace; font-size: 7px; text-align: center; }
+.rank-labels { position: absolute; top: 3%; right: -22px; height: 94%; color: #496168; font-family: "Yu Mincho", serif; font-size: 7px; line-height: calc(1 / .09); writing-mode: vertical-rl; word-spacing: .7em; }
+.board-square { position: relative; min-width: 0; display: grid; place-items: center; border: 0; border-right: 1px solid rgba(6, 22, 25, .72); border-bottom: 1px solid rgba(6, 22, 25, .72); background: linear-gradient(140deg, rgba(47, 79, 78, .98), rgba(35, 61, 62, .98)); padding: 0; cursor: pointer; transition: background .15s, box-shadow .15s; }
+.board-square:nth-child(9n) { border-right: 0; }
+.board-square:nth-child(n+73) { border-bottom: 0; }
+.board-square:hover { background: #3b6260; }
+.board-square.selected-square { z-index: 2; box-shadow: inset 0 0 0 3px #e1b869, inset 0 0 26px rgba(225, 184, 105, .22); }
+.board-square.last-square:not(.selected-square) { box-shadow: inset 0 0 0 2px rgba(218, 176, 96, .48), inset 0 0 18px rgba(218, 176, 96, .1); }
+.board-square.legal-square { background: linear-gradient(140deg, #3f716b, #315a59); }
+.move-dot { position: absolute; z-index: 5; width: 16%; aspect-ratio: 1; border-radius: 99px; background: #d9b061; box-shadow: 0 0 13px rgba(227, 186, 106, .85); pointer-events: none; }
+.move-dot.capture-dot { width: 76%; border: clamp(2px, .4vw, 4px) solid rgba(225, 177, 91, .78); background: transparent; box-shadow: inset 0 0 15px rgba(225, 177, 91, .15), 0 0 10px rgba(225, 177, 91, .2); }
+.shogi-piece { position: relative; z-index: 3; width: 72%; height: 80%; display: grid; place-items: center; padding-top: 7%; background: linear-gradient(150deg, #d7b476, #ab7d43); color: #1c2625; clip-path: polygon(50% 0, 95% 18%, 86% 100%, 14% 100%, 5% 18%); font-family: "Yu Mincho", "Hiragino Mincho ProN", serif; font-size: clamp(10px, 1.65vw, 22px); font-weight: 800; filter: drop-shadow(0 4px 4px rgba(0, 0, 0, .35)); pointer-events: none; }
+.shogi-piece > span { line-height: 1; }
+.shogi-piece small { position: absolute; right: 7%; top: 9%; display: grid; place-items: center; width: 30%; aspect-ratio: 1; border-radius: 99px; background: #d5ab61; color: #172326; font-family: system-ui, sans-serif; font-size: clamp(6px, .8vw, 10px); }
+.enemy-piece { transform: rotate(180deg); background: linear-gradient(150deg, #24343a, #101c22); color: #71858a; outline: 1px solid rgba(133, 159, 162, .16); outline-offset: -1px; }
+.enemy-piece small { transform: rotate(180deg); background: #60777c; color: #0b171c; }
+
+.control-panel { align-self: center; border-left: 1px solid rgba(146, 164, 159, .12); padding-left: 25px; }
+.control-panel h3 { margin: 0; color: #d8ddd7; font-family: "Yu Mincho", "Hiragino Mincho ProN", serif; font-size: 20px; font-weight: 500; }
+.control-panel > p:not(.section-label) { margin: 12px 0 20px; font-size: 11px; line-height: 1.9; }
+.start-button { width: 100%; height: 45px; background: linear-gradient(110deg, #caa15f, #a9793f); color: #10191c; font-size: 12px; font-weight: 800; letter-spacing: .05em; box-shadow: 0 12px 28px rgba(169, 121, 63, .14); }
+.start-button:hover, .handoff-button:hover { background: linear-gradient(110deg, #dab36f, #b8894b); }
+.setup-list { margin: 22px 0 0; }
+.setup-list div { display: flex; justify-content: space-between; border-top: 1px solid rgba(129, 154, 154, .1); padding: 11px 0; font-size: 10px; }
+.setup-list dt { color: #53696f; }
+.setup-list dd { margin: 0; color: #a4b1ae; }
+.status-card { display: flex; align-items: center; gap: 13px; border: 1px solid rgba(199, 158, 91, .16); background: rgba(199, 158, 91, .05); padding: 14px; }
+.status-number { color: #c69a55; font-family: Georgia, serif; font-size: 27px; }
+.status-card strong, .status-card small { display: block; }
+.status-card strong { color: #ad9a7c; font-size: 10px; }
+.status-card small { margin-top: 3px; color: #5e7378; font-size: 8px; }
+.tip-card { width: 100%; display: flex; align-items: center; gap: 11px; margin-top: 10px; border: 1px solid rgba(121, 153, 157, .11); background: rgba(11, 26, 35, .5); padding: 12px; color: #72868b; text-align: left; }
+.tip-card svg { width: 17px; color: #9b7c4b; }
+.tip-card strong, .tip-card small { display: block; }
+.tip-card strong { color: #9eaaa8; font-size: 10px; }
+.tip-card small { margin-top: 3px; color: #52676d; font-size: 8px; }
+
+.handoff-screen { position: fixed; z-index: 80; inset: 0; width: auto; max-width: none; margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle, #132b35 0, #071018 46%, #050b10 100%); color: inherit; text-align: center; }
+.handoff-screen::before { content: ''; position: absolute; inset: 24px; border: 1px solid rgba(179, 145, 84, .12); pointer-events: none; }
+.handoff-piece { width: 76px; height: 84px; margin-bottom: 26px; background: linear-gradient(155deg, #263942, #0e1b21); color: #667b80; font-size: 28px; filter: drop-shadow(0 18px 28px rgba(0, 0, 0, .45)); }
+.handoff-screen h2 { margin: 0; color: #ece9de; font-family: "Yu Mincho", serif; font-size: clamp(35px, 6vw, 62px); font-weight: 400; line-height: 1.35; letter-spacing: .08em; }
+.handoff-screen > p:not(.section-label) { margin: 18px 20px 28px; color: #687b81; font-size: 11px; }
+.handoff-button { height: 48px; background: linear-gradient(110deg, #caa15f, #a9793f); padding-inline: 28px; color: #111a1d; font-weight: 800; }
+.handoff-screen > small { margin-top: 13px; color: #3f545a; font-size: 8px; }
+
+[data-slot='dialog-overlay'] { background: rgba(2, 8, 12, .78); backdrop-filter: blur(10px); }
+[data-slot='dialog-content'] { border: 1px solid rgba(136, 163, 164, .17); background: linear-gradient(145deg, #11212a, #0a151c); color: #dfe5df; box-shadow: 0 30px 90px rgba(0, 0, 0, .55); }
+[data-slot='dialog-title'] { font-family: "Yu Mincho", serif; font-size: 19px; letter-spacing: .04em; }
+[data-slot='dialog-description'] { color: #71868b; font-size: 10px; line-height: 1.7; }
+[data-slot='dialog-footer'] { border-color: rgba(122, 148, 150, .1); background: rgba(7, 18, 24, .52); }
+.guess-layout { display: grid; grid-template-columns: 180px 1fr; gap: 22px; }
+.dialog-label { display: flex; align-items: center; gap: 7px; margin: 0 0 9px; color: #a7906b; font-size: 9px; font-weight: 700; letter-spacing: .09em; }
+.dialog-label svg { width: 13px; }
+.trace-grid { display: grid; grid-template-columns: repeat(5, 1fr); aspect-ratio: 1; border: 1px solid #28434a; background: #142a31; }
+.trace-grid span { display: grid; place-items: center; border-right: 1px solid #28434a; border-bottom: 1px solid #28434a; color: #172329; font-family: "Yu Mincho", serif; font-size: 14px; }
+.trace-grid span:nth-child(5n) { border-right: 0; }
+.trace-grid span:nth-child(n+21) { border-bottom: 0; }
+.trace-grid .trace-observed::after { content: ''; width: 30%; aspect-ratio: 1; border-radius: 99px; background: #cda55e; box-shadow: 0 0 11px rgba(205, 165, 94, .72); }
+.trace-grid .trace-center { background: linear-gradient(145deg, #24353b, #0f1c22); color: #72858a; }
+.trace-grid .trace-center::after { display: none; }
+.guess-choices { min-width: 0; }
+.guess-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 14px; }
+.guess-grid button { position: relative; aspect-ratio: .85; border: 1px solid rgba(204, 170, 107, .19); background: linear-gradient(150deg, #cda96d, #9d713e); color: #182326; clip-path: polygon(50% 0, 94% 18%, 86% 100%, 14% 100%, 6% 18%); font-family: "Yu Mincho", serif; font-size: 16px; font-weight: 800; }
+.guess-grid button:hover { filter: brightness(1.13); }
+.guess-grid button small { position: absolute; right: 9%; top: 11%; display: grid; place-items: center; width: 30%; aspect-ratio: 1; border-radius: 99px; background: #24343a; color: #bd985b; font-family: system-ui, sans-serif; font-size: 7px; }
+.uncertain-grid button { background: linear-gradient(150deg, #5f6c6f, #35454b); color: #172328; }
+.promotion-dialog, .result-dialog { text-align: center; }
+.result-piece { width: 70px; height: 76px; margin: 3px auto 7px; font-size: 25px; }
+.rules-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.rules-list li { display: grid; grid-template-columns: 35px 1fr; gap: 10px; border-top: 1px solid rgba(126, 151, 152, .1); padding-top: 10px; }
+.rules-list li > span { color: #9d7843; font-family: Georgia, serif; font-size: 16px; }
+.rules-list strong { color: #bfc9c6; font-size: 11px; }
+.rules-list p { margin: 3px 0 0; color: #657a80; font-size: 9px; line-height: 1.7; }
+
+@media (max-width: 1160px) {
+  .game-stage { grid-template-columns: minmax(500px, 650px) minmax(220px, 270px); }
+  .intro-panel { display: none; }
+}
+@media (max-width: 850px) {
+  .topbar { width: min(100% - 28px, 650px); grid-template-columns: 1fr auto; min-height: 68px; }
+  .tagline { display: none; }
+  .game-stage { width: min(100% - 24px, 650px); grid-template-columns: 1fr; gap: 18px; padding-top: 26px; }
+  .control-panel { order: -1; border-left: 0; border-bottom: 1px solid rgba(146, 164, 159, .12); padding: 0 0 16px; }
+  .control-panel > p:not(.section-label), .setup-list { display: none; }
+  .control-panel h3 { font-size: 17px; }
+  .start-button { margin-top: 13px; }
+  .status-card { margin-top: 12px; }
+  .tip-card { display: none; }
+  .board-frame { border-width: 6px; }
+  .file-labels { top: -18px; }
+  .rank-labels { display: none; }
+}
+@media (max-width: 600px) {
+  .brand-kicker { display: none; }
+  .brand-piece { width: 31px; height: 34px; font-size: 13px; }
+  .brand-lockup h1 { margin: 0; font-size: 15px; }
+  .top-actions button { padding-inline: 7px; }
+  .top-actions button:first-child { font-size: 0; }
+  .top-actions button svg { width: 15px; }
+  .game-stage { padding-bottom: 22px; }
+  .captured-zone { padding: 7px; }
+  .hand-piece { min-width: 39px; height: 33px; }
+  .hand-piece span { font-size: 14px; }
+  .shogi-piece { font-size: clamp(10px, 4vw, 18px); }
+  .guess-layout { grid-template-columns: 1fr; }
+  .trace-grid { width: 150px; margin-inline: auto; }
+  .guess-grid { grid-template-columns: repeat(7, 1fr); }
+  .guess-grid button { font-size: 13px; }
+}
