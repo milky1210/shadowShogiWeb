@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import Image from 'next/image';
 import { Bot, BookOpen, BrainCircuit, CircleHelp, Eye, Footprints, RotateCcw, ShieldQuestion, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,7 +32,6 @@ import {
   type GuessName,
   type HandPieceName,
   type Piece,
-  type PieceName,
   type Position,
   type Side,
 } from '@/lib/shadow-shogi';
@@ -60,11 +58,6 @@ const CPU_LEVELS: Array<{ level: CpuLevel; name: string; badge: string; descript
   { level: 2, name: '中級', badge: 'READER', description: '見えた動きを読み、危険と前進を評価する。' },
   { level: 3, name: '最強', badge: 'OMNISCIENT', description: '全配置を理解し、完全情報で先を読む。' },
 ];
-const PIECE_ASSET_KEYS: Record<PieceName, string> = {
-  歩: 'fu', 香: 'kyo', 桂: 'kei', 銀: 'gin', 金: 'kin', 角: 'kaku', 飛: 'hisha', 王: 'ou',
-  と: 'to', 杏: 'narikyo', 圭: 'narikei', 全: 'narigin', 馬: 'uma', 龍: 'ryu',
-};
-
 function moveKey([row, column]: Position) {
   return `${row}-${column}`;
 }
@@ -78,14 +71,13 @@ function isUncertain(guess: GuessName | undefined) {
   return Boolean(guess && guess !== '?' && guess.endsWith('?'));
 }
 
-function guessedPieceName(guess: GuessName | undefined): PieceName | null {
-  if (!guess || guess === '?') return null;
-  return (guess.endsWith('?') ? guess.slice(0, -1) : guess) as PieceName;
-}
-
-function PieceAsset({ name, tone, className = '' }: { name: PieceName | null; tone: 'black' | 'white'; className?: string }) {
-  const source = name ? `/pieces/${PIECE_ASSET_KEYS[name]}-${tone}.png` : '/pieces/shadow-black.png';
-  return <Image className={className} src={source} alt="" width={256} height={256} draggable={false} />;
+function PieceFace({ label, tone, className = '', uncertain = false }: { label: string; tone: 'light' | 'shadow'; className?: string; uncertain?: boolean }) {
+  return (
+    <span className={`piece-face piece-face-${tone} ${className}`} aria-hidden="true">
+      <span className="piece-face-label">{label}</span>
+      {uncertain ? <small className="piece-face-uncertain">?</small> : null}
+    </span>
+  );
 }
 
 function boardPosition(displayRow: number, displayColumn: number, viewer: Side): Position {
@@ -94,13 +86,7 @@ function boardPosition(displayRow: number, displayColumn: number, viewer: Side):
 
 function PieceGlyph({ piece, viewer, guess }: { piece: Piece; viewer: Side; guess?: GuessName }) {
   const own = piece.side === viewer;
-  const visibleName = own ? piece.name : guessedPieceName(guess);
-  return (
-    <span className={`shogi-piece ${own ? 'own-piece' : 'enemy-piece'}`} aria-hidden="true">
-      <PieceAsset name={visibleName} tone={own ? 'white' : 'black'} className="board-piece-image" />
-      {!own && isUncertain(guess) ? <Image className="piece-uncertain-mark" src="/pieces/shadow-small.png" alt="" width={256} height={256} draggable={false} /> : null}
-    </span>
-  );
+  return <PieceFace label={own ? piece.name : displayName(guess)} tone={own ? 'light' : 'shadow'} className={`shogi-piece ${own ? 'own-piece' : 'enemy-piece'}`} uncertain={!own && isUncertain(guess)} />;
 }
 
 function MoveTrace({ moves }: { moves: Position[] }) {
@@ -111,7 +97,7 @@ function MoveTrace({ moves }: { moves: Position[] }) {
         const row = Math.floor(index / 5) - 2;
         const column = index % 5 - 2;
         const center = row === 0 && column === 0;
-        return <span key={index} className={`${center ? 'trace-center' : ''} ${observed.has(moveKey([row, column])) ? 'trace-observed' : ''}`}>{center ? <PieceAsset name={null} tone="black" className="trace-center-piece" /> : null}</span>;
+        return <span key={index} className={`${center ? 'trace-center' : ''} ${observed.has(moveKey([row, column])) ? 'trace-observed' : ''}`}>{center ? <PieceFace label="?" tone="shadow" className="trace-center-piece" /> : null}</span>;
       })}
     </div>
   );
@@ -353,11 +339,8 @@ export function GameApp() {
 
         <section className="board-column" aria-label="影将棋の盤面">
           <div className="captured-zone opponent-zone">
-            <div className="zone-heading"><div><span className="mini-piece">影</span><p><strong>{opponentLabel}</strong><small>相手の持ち駒と取られた駒</small></p></div><span className="shadow-count">影 × {handTotal(shownGame.hands[opponent])}</span></div>
-            <div className="captured-list">
-              {HAND_NAMES.filter((name) => shownGame.takenLogs[viewer][name] > 0).map((name) => <span className="captured-chip" key={name}><PieceAsset name={name} tone="black" className="captured-piece-image" /><small>×{shownGame.takenLogs[viewer][name]}</small></span>)}
-              {HAND_NAMES.every((name) => shownGame.takenLogs[viewer][name] === 0) ? <span className="empty-hand">まだ駒は取られていません</span> : null}
-            </div>
+            <div className="zone-heading"><div><span className="mini-piece">影</span><p><strong>{opponentLabel}</strong><small>持ち駒の種類は非公開</small></p></div><span className="shadow-count">合計 {handTotal(shownGame.hands[opponent])} 枚</span></div>
+            <div className="opponent-hand-hidden" aria-label={`相手の持ち駒は合計${handTotal(shownGame.hands[opponent])}枚。種類は非公開です。`}><ShieldQuestion /><span>相手の持ち駒は合計だけ表示されます</span></div>
           </div>
 
           <div className="board-frame">
@@ -395,7 +378,7 @@ export function GameApp() {
               {HAND_NAMES.map((name) => {
                 const count = shownGame.hands[viewer][name];
                 const active = selection?.kind === 'hand' && selection.name === name;
-                return <button type="button" key={name} aria-label={`${name}を打つ（${count}枚）`} disabled={!game || count < 1 || phase !== 'playing'} className={`hand-piece ${active ? 'active' : ''}`} onClick={() => selectHand(name)}><PieceAsset name={name} tone="white" className="hand-piece-image" /><small>×{count}</small></button>;
+                return <button type="button" key={name} aria-label={`${name}を打つ（${count}枚）`} disabled={!game || count < 1 || phase !== 'playing'} className={`hand-piece ${active ? 'active' : ''}`} onClick={() => selectHand(name)}><PieceFace label={name} tone="light" className="hand-piece-face" /><small>×{count}</small></button>;
               })}
             </div>
           </div>
@@ -448,8 +431,8 @@ export function GameApp() {
           <div className="guess-layout">
             <div><p className="dialog-label"><Footprints /> 今までの移動</p><MoveTrace moves={guessTarget && game ? game.moveLogs[guessTarget.id] ?? [] : []} /></div>
             <div className="guess-choices">
-              <p className="dialog-label">確定予想</p><div className="guess-grid">{GUESS_NAMES.map((name) => <button type="button" key={name} aria-label={`${name}に確定`} onClick={() => saveGuess(name)}><PieceAsset name={name} tone="black" className="guess-piece-image" /></button>)}</div>
-              <p className="dialog-label">まだ自信がない</p><div className="guess-grid uncertain-grid">{GUESS_NAMES.map((name) => <button type="button" key={name} aria-label={`${name}かもしれない`} onClick={() => saveGuess(`${name}?` as GuessName)}><PieceAsset name={name} tone="black" className="guess-piece-image" /><Image className="guess-uncertain-mark" src="/pieces/shadow-small.png" alt="" width={256} height={256} draggable={false} /></button>)}</div>
+              <p className="dialog-label">確定予想</p><div className="guess-grid">{GUESS_NAMES.map((name) => <button type="button" key={name} aria-label={`${name}に確定`} onClick={() => saveGuess(name)}><PieceFace label={name} tone="shadow" className="guess-piece-face" /></button>)}</div>
+              <p className="dialog-label">まだ自信がない</p><div className="guess-grid uncertain-grid">{GUESS_NAMES.map((name) => <button type="button" key={name} aria-label={`${name}かもしれない`} onClick={() => saveGuess(`${name}?` as GuessName)}><PieceFace label={name} tone="shadow" className="guess-piece-face" uncertain /></button>)}</div>
             </div>
           </div>
           <DialogFooter><Button variant="outline" onClick={() => saveGuess('?')}>予想を消す</Button><Button variant="ghost" onClick={() => setGuessTarget(null)}>戻る</Button></DialogFooter>
