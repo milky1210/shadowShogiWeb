@@ -71,6 +71,25 @@ function isUncertain(guess: GuessName | undefined) {
   return Boolean(guess && guess !== '?' && guess.endsWith('?'));
 }
 
+function actionLogText(move: GameState['moveHistory'][number], viewer: Side) {
+  if (move.captured) {
+    return move.side === viewer
+      ? `相手の${move.captured}を取得！`
+      : `${move.captured}を取られた`;
+  }
+
+  const destination = boardCoordinates(move.to);
+  if (move.dropped) {
+    return move.side === viewer
+      ? `${destination}へ持ち駒を打った`
+      : `相手が${destination}へ持ち駒を打った`;
+  }
+
+  return move.side === viewer
+    ? `${destination}へ移動した`
+    : `相手が${destination}へ移動した`;
+}
+
 function PieceFace({ label, tone, className = '', uncertain = false }: { label: string; tone: 'light' | 'shadow'; className?: string; uncertain?: boolean }) {
   return (
     <span className={`piece-face piece-face-${tone} ${className}`} aria-hidden="true">
@@ -306,9 +325,10 @@ export function GameApp() {
   const selectedText = selection?.kind === 'board'
     ? `${shownGame.board[selection.from[0]][selection.from[1]]?.name ?? ''}を選択中`
     : selection?.kind === 'hand' ? `${selection.name}を打つ場所を選択中` : '自分の駒を選んでください';
+  const latestActions = game?.moveHistory.slice(-2).reverse() ?? [];
 
   return (
-    <main className="game-page">
+    <main className={`game-page ${phase === 'handoff' ? 'handoff-active' : ''}`}>
       <header className="topbar">
         <div className="brand-lockup"><span className="brand-piece">影</span><div><p className="brand-kicker">SHADOW SHOGI</p><h1>影将棋</h1></div></div>
         <p className="tagline">その一手が、正体を語る。</p>
@@ -407,7 +427,19 @@ export function GameApp() {
               <p className="section-label">{gameMode === 'cpu' ? `${cpuLevelInfo.badge} CPU` : 'CURRENT TURN'}</p><h3>{phase === 'cpu-thinking' ? 'CPUが思考中' : `${playerLabel(game?.turn ?? viewer)}の手番`}</h3>
               <p>{phase === 'cpu-thinking' ? `${cpuLevelInfo.name}CPUが盤面を読んでいます。相手の駒はあなたには影のままです。` : '自分の駒を選ぶと移動可能な升が光ります。相手の影を選ぶと予想を記録できます。'}</p>
               {phase === 'cpu-thinking' ? <div className="cpu-thinking"><BrainCircuit /><span /><span /><span /></div> : null}
-              <div className="status-card"><span className="status-number">{(game?.moveHistory.length ?? 0) + 1}</span><div><strong>手目</strong><small>{selection ? selectedText : '盤面を観察中'}</small></div></div>
+              <div className="activity-card" aria-live="polite">
+                <div className="activity-heading"><Footprints /><strong>最新の行動</strong></div>
+                {latestActions.length > 0 ? (
+                  <ol className="activity-list">
+                    {latestActions.map((move, index) => (
+                      <li className={move.captured ? 'capture-activity' : ''} key={`${move.pieceId}-${game!.moveHistory.length - index}`}>
+                        <span>{game!.moveHistory.length - index}</span>
+                        <p>{actionLogText(move, viewer)}</p>
+                      </li>
+                    ))}
+                  </ol>
+                ) : <p className="activity-empty">まだ行動はありません</p>}
+              </div>
               {gameMode === 'cpu' && cpuReport ? <p className="cpu-report">前回の探索：深さ {cpuReport.depth}・{cpuReport.nodes.toLocaleString()}局面</p> : null}
               <button type="button" className="tip-card" onClick={() => setRulesOpen(true)}><CircleHelp /><span><strong>ルールを確認</strong><small>成り・持ち駒・二歩について</small></span></button>
             </>
@@ -419,7 +451,7 @@ export function GameApp() {
         <dialog open className="handoff-screen" aria-modal="true" aria-labelledby="handoff-title">
           <span className="handoff-piece">影</span><p className="section-label">PASS THE DEVICE</p>
           <h2 id="handoff-title">{sideLabel(game.turn)}番に<br />渡してください</h2>
-          <p>盤面は隠れています。次のプレイヤーだけが画面を見てください。</p>
+          <p>盤面と両者の持ち駒を隠しています。端末を渡してから、次のプレイヤーだけが開いてください。</p>
           <Button className="handoff-button" onClick={() => { setViewer(game.turn); setPhase('playing'); }}>準備できたら盤面を見る</Button>
           <small>Enter キーでも進めます</small>
         </dialog>

@@ -84,7 +84,7 @@ button { font: inherit; }
 .piece-face-light { --piece-edge: #704c25; --piece-fill: linear-gradient(145deg, #e6c98d, #bd8a4d); --piece-ink: #171d1c; }
 .piece-face-shadow { --piece-edge: #607278; --piece-fill: linear-gradient(145deg, #25353b, #101b20); --piece-ink: #d9e0dc; }
 .piece-face-label { position: relative; z-index: 1; max-width: 78%; transform: translateY(8%); text-align: center; }
-.piece-face-uncertain { position: absolute; z-index: 2; top: 21%; right: 13%; display: grid; place-items: center; width: 27%; aspect-ratio: 1; border: 1px solid rgba(223, 191, 125, .5); border-radius: 50%; background: #17262c; color: #e5bd72; font-family: system-ui, sans-serif; font-size: .38em; line-height: 1; }
+.piece-face-uncertain { position: absolute; z-index: 2; top: 14%; right: 8%; color: #f0c66f; font-family: system-ui, sans-serif; font-size: .68em; font-weight: 900; line-height: 1; text-shadow: 0 1px 2px #071018, 0 0 5px rgba(240, 198, 111, .38); }
 .hand-piece { position: relative; min-width: 48px; height: 42px; display: inline-grid; place-items: center; border: 1px solid rgba(204, 170, 107, .15); background: rgba(176, 128, 62, .05); padding: 2px 8px 2px 3px; color: #8f7957; cursor: pointer; transition: .16s ease; }
 .hand-piece-face { width: 28px; height: 34px; font-size: 15px; }
 .hand-piece small { position: absolute; right: 3px; bottom: 2px; font-size: 8px; }
@@ -126,11 +126,16 @@ button { font: inherit; }
 .setup-list div { display: flex; justify-content: space-between; border-top: 1px solid rgba(129, 154, 154, .1); padding: 11px 0; font-size: 10px; }
 .setup-list dt { color: #53696f; }
 .setup-list dd { margin: 0; color: #a4b1ae; }
-.status-card { display: flex; align-items: center; gap: 13px; border: 1px solid rgba(199, 158, 91, .16); background: rgba(199, 158, 91, .05); padding: 14px; }
-.status-number { color: #c69a55; font-family: Georgia, serif; font-size: 27px; }
-.status-card strong, .status-card small { display: block; }
-.status-card strong { color: #ad9a7c; font-size: 10px; }
-.status-card small { margin-top: 3px; color: #5e7378; font-size: 8px; }
+.activity-card { border: 1px solid rgba(199, 158, 91, .16); background: rgba(199, 158, 91, .05); padding: 12px 14px; }
+.activity-heading { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; color: #ad9a7c; }
+.activity-heading svg { width: 14px; }
+.activity-heading strong { font-size: 9px; letter-spacing: .08em; }
+.activity-list { margin: 0; padding: 0; list-style: none; }
+.activity-list li { min-height: 29px; display: grid; grid-template-columns: 20px minmax(0, 1fr); align-items: center; gap: 8px; border-top: 1px solid rgba(199, 158, 91, .1); }
+.activity-list li > span { color: #596d72; font-family: Georgia, serif; font-size: 10px; }
+.activity-list p { margin: 0; color: #87989a; font-size: 9px; line-height: 1.45; }
+.activity-list .capture-activity p { color: #dfba78; font-weight: 700; }
+.activity-empty { margin: 10px 0 2px; color: #5e7378; font-size: 9px; }
 .cpu-thinking { height: 36px; display: flex; align-items: center; justify-content: center; gap: 7px; margin: -3px 0 12px; border: 1px solid rgba(199, 158, 91, .14); background: rgba(199, 158, 91, .04); color: #b78e51; }
 .cpu-thinking svg { width: 17px; }
 .cpu-thinking span { width: 5px; height: 5px; border-radius: 50%; background: #b78e51; animation: cpu-pulse 1s ease-in-out infinite; }
@@ -145,6 +150,7 @@ button { font: inherit; }
 .tip-card small { margin-top: 3px; color: #52676d; font-size: 8px; }
 
 .handoff-screen { position: fixed; z-index: 80; inset: 0; width: auto; max-width: none; margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle, #132b35 0, #071018 46%, #050b10 100%); color: inherit; text-align: center; }
+.handoff-active .topbar, .handoff-active .game-stage { visibility: hidden; pointer-events: none; }
 .handoff-screen::before { content: ''; position: absolute; inset: 24px; border: 1px solid rgba(179, 145, 84, .12); pointer-events: none; }
 .handoff-piece { width: 76px; height: 84px; margin-bottom: 26px; background: linear-gradient(155deg, #263942, #0e1b21); color: #667b80; font-size: 28px; filter: drop-shadow(0 18px 28px rgba(0, 0, 0, .45)); }
 .handoff-screen h2 { margin: 0; color: #ece9de; font-family: "Yu Mincho", serif; font-size: clamp(35px, 6vw, 62px); font-weight: 400; line-height: 1.35; letter-spacing: .08em; }
@@ -169,10 +175,10 @@ button { font: inherit; }
 .trace-grid .trace-center::after { display: none; }
 .trace-center-piece { width: 70%; height: 82%; font-size: 16px; }
 .guess-choices { min-width: 0; }
-.guess-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 14px; }
-.guess-grid button { position: relative; aspect-ratio: 1; display: grid; place-items: center; overflow: hidden; border: 1px solid rgba(204, 170, 107, .19); background: rgba(34, 49, 55, .72); padding: 2px; cursor: pointer; }
+.guess-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin-bottom: 14px; }
+.guess-grid button { position: relative; width: 100%; min-width: 0; min-height: 0; aspect-ratio: 1; display: grid; place-items: center; overflow: hidden; border: 1px solid rgba(204, 170, 107, .19); background: rgba(34, 49, 55, .72); padding: clamp(2px, .45vw, 5px); cursor: pointer; }
 .guess-grid button:hover { border-color: rgba(218, 178, 106, .58); background: rgba(67, 82, 84, .8); filter: brightness(1.1); }
-.guess-piece-face { width: 78%; height: 90%; font-size: clamp(15px, 2.1vw, 22px); }
+.guess-piece-face { width: 78%; height: auto; aspect-ratio: 11 / 13; font-size: clamp(14px, 2.1vw, 22px); }
 .uncertain-grid button { background: rgba(28, 41, 47, .82); }
 .promotion-dialog, .result-dialog { text-align: center; }
 .result-piece { width: 70px; height: 76px; margin: 3px auto 7px; font-size: 25px; }
@@ -198,7 +204,7 @@ button { font: inherit; }
   .cpu-level-grid { grid-template-columns: repeat(3, 1fr); }
   .cpu-level-grid button { grid-template-columns: 24px 1fr; min-height: 58px; }
   .cpu-level-grid em { display: none; }
-  .status-card { margin-top: 12px; }
+  .activity-card { margin-top: 12px; }
   .tip-card { display: none; }
   .board-frame { border-width: 6px; }
   .file-labels { top: -18px; }
@@ -218,6 +224,7 @@ button { font: inherit; }
   .shogi-piece { width: 84%; height: 90%; font-size: clamp(14px, 4vw, 19px); }
   .guess-layout { grid-template-columns: 1fr; }
   .trace-grid { width: 150px; margin-inline: auto; }
-  .guess-grid { grid-template-columns: repeat(7, 1fr); }
-  .guess-grid button { font-size: 13px; }
+  .guess-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+  .guess-grid button { padding: 2px; }
+  .guess-piece-face { width: 82%; font-size: clamp(13px, 4vw, 18px); }
 }
