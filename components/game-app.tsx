@@ -526,9 +526,9 @@ export function GameApp() {
             <>
               <p className="section-label">{gameMode === 'cpu' ? `${cpuLevelInfo.badge} CPU` : 'CURRENT TURN'}</p><h3>{phase === 'cpu-thinking' ? 'CPUが思考中' : `${playerLabel(game?.turn ?? viewer)}の手番`}</h3>
               <p>{phase === 'cpu-thinking' ? `${cpuLevelInfo.name}CPUが盤面を読んでいます。相手の駒はあなたには影のままです。` : '自分の駒を選ぶと移動可能な升が光ります。相手の影を選ぶと予想を記録できます。'}</p>
-              {phase === 'cpu-thinking' ? <div className="cpu-thinking"><BrainCircuit /><span /><span /><span /></div> : null}
+              {gameMode === 'cpu' ? <div className={`cpu-thinking ${phase === 'cpu-thinking' ? 'is-active' : ''}`} aria-hidden={phase !== 'cpu-thinking'}><BrainCircuit /><span /><span /><span /></div> : null}
               <ActivityLog state={shownGame} viewer={viewer} onSelect={canReview ? openReview : undefined} />
-              {gameMode === 'cpu' && cpuReport ? <p className="cpu-report">前回の探索：深さ {cpuReport.depth}・{cpuReport.nodes.toLocaleString()}局面</p> : null}
+              {gameMode === 'cpu' ? <p className={`cpu-report ${cpuReport ? 'is-active' : ''}`} aria-hidden={!cpuReport}>{cpuReport ? `前回の探索：深さ ${cpuReport.depth}・${cpuReport.nodes.toLocaleString()}局面` : '探索結果の表示領域'}</p> : null}
               <button type="button" className="tip-card" onClick={() => setRulesOpen(true)}><CircleHelp /><span><strong>ルールを確認</strong><small>成り・持ち駒・二歩について</small></span></button>
             </>
           )}

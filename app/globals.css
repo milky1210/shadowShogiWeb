@@ -133,7 +133,7 @@ button { font: inherit; }
 .setup-list div { display: flex; justify-content: space-between; border-top: 1px solid rgba(129, 154, 154, .1); padding: 11px 0; font-size: 10px; }
 .setup-list dt { color: #53696f; }
 .setup-list dd { margin: 0; color: #a4b1ae; }
-.activity-card { border: 1px solid rgba(199, 158, 91, .16); background: rgba(199, 158, 91, .05); padding: 12px 14px; }
+.activity-card { min-height: 112px; border: 1px solid rgba(199, 158, 91, .16); background: rgba(199, 158, 91, .05); padding: 12px 14px; }
 .activity-heading { display: flex; align-items: center; justify-content: space-between; gap: 7px; margin-bottom: 6px; color: #ad9a7c; }
 .activity-heading > span { display: flex; align-items: center; gap: 7px; }
 .activity-heading svg { width: 14px; }
@@ -168,11 +168,14 @@ button { font: inherit; }
 .reveal-toggle small { margin-top: 2px; color: #5d7277; font-size: 7px; }
 .review-result-button { width: 100%; font-size: 9px; }
 .cpu-thinking { height: 36px; display: flex; align-items: center; justify-content: center; gap: 7px; margin: -3px 0 12px; border: 1px solid rgba(199, 158, 91, .14); background: rgba(199, 158, 91, .04); color: #b78e51; }
+.cpu-thinking:not(.is-active) { visibility: hidden; }
 .cpu-thinking svg { width: 17px; }
 .cpu-thinking span { width: 5px; height: 5px; border-radius: 50%; background: #b78e51; animation: cpu-pulse 1s ease-in-out infinite; }
+.cpu-thinking:not(.is-active) span { animation-play-state: paused; }
 .cpu-thinking span:nth-of-type(2) { animation-delay: .14s; }
 .cpu-thinking span:nth-of-type(3) { animation-delay: .28s; }
-.cpu-report { margin: 7px 0 0 !important; color: #4f666b !important; font-family: ui-monospace, monospace; font-size: 7px !important; letter-spacing: .04em; }
+.cpu-report { min-height: 10px; margin: 7px 0 0 !important; color: #4f666b !important; font-family: ui-monospace, monospace; font-size: 7px !important; letter-spacing: .04em; }
+.cpu-report:not(.is-active) { visibility: hidden; }
 @keyframes cpu-pulse { 0%, 70%, 100% { opacity: .24; transform: translateY(0); } 35% { opacity: 1; transform: translateY(-3px); } }
 .tip-card { width: 100%; display: flex; align-items: center; gap: 11px; margin-top: 10px; border: 1px solid rgba(121, 153, 157, .11); background: rgba(11, 26, 35, .5); padding: 12px; color: #72868b; text-align: left; }
 .tip-card svg { width: 17px; color: #9b7c4b; }
