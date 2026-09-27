@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bot, BookOpen, BrainCircuit, CircleHelp, Eye, Footprints, RotateCcw, ShieldQuestion, Users } from 'lucide-react';
+import { Bot, BookOpen, BrainCircuit, CircleHelp, Eye, EyeOff, Footprints, RotateCcw, ShieldQuestion, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -90,6 +90,35 @@ function actionLogText(move: GameState['moveHistory'][number], viewer: Side) {
     : `相手が${destination}へ移動した`;
 }
 
+function ActivityLog({ state, viewer, onSelect }: { state: GameState; viewer: Side; onSelect?: (moveNumber: number) => void }) {
+  const actions = state.moveHistory.slice(-2);
+  const firstMoveNumber = state.moveHistory.length - actions.length + 1;
+
+  return (
+    <div className="activity-card" aria-live="polite">
+      <div className="activity-heading">
+        <span><Footprints /><strong>最新の行動</strong></span>
+        {onSelect ? <small>タップで局面へ</small> : null}
+      </div>
+      {actions.length > 0 ? (
+        <ol className="activity-list">
+          {actions.map((move, index) => {
+            const moveNumber = firstMoveNumber + index;
+            return (
+              <li className={move.captured ? 'capture-activity' : ''} key={`${move.pieceId}-${moveNumber}`}>
+                <button type="button" disabled={!onSelect} onClick={() => onSelect?.(moveNumber)}>
+                  <span>{moveNumber}</span>
+                  <p>{actionLogText(move, viewer)}</p>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      ) : <p className="activity-empty">まだ行動はありません</p>}
+    </div>
+  );
+}
+
 function PieceFace({ label, tone, className = '', uncertain = false }: { label: string; tone: 'light' | 'shadow'; className?: string; uncertain?: boolean }) {
   return (
     <span className={`piece-face piece-face-${tone} ${className}`} aria-hidden="true">
@@ -103,9 +132,10 @@ function boardPosition(displayRow: number, displayColumn: number, viewer: Side):
   return viewer === 1 ? [8 - displayRow, 8 - displayColumn] : [displayRow, displayColumn];
 }
 
-function PieceGlyph({ piece, viewer, guess }: { piece: Piece; viewer: Side; guess?: GuessName }) {
+function PieceGlyph({ piece, viewer, guess, revealOpponent = false }: { piece: Piece; viewer: Side; guess?: GuessName; revealOpponent?: boolean }) {
   const own = piece.side === viewer;
-  return <PieceFace label={own ? piece.name : displayName(guess)} tone={own ? 'light' : 'shadow'} className={`shogi-piece ${own ? 'own-piece' : 'enemy-piece'}`} uncertain={!own && isUncertain(guess)} />;
+  const revealed = !own && revealOpponent;
+  return <PieceFace label={own || revealed ? piece.name : displayName(guess)} tone={own || revealed ? 'light' : 'shadow'} className={`shogi-piece ${own ? 'own-piece' : 'enemy-piece'} ${revealed ? 'revealed-piece' : ''}`} uncertain={!own && !revealed && isUncertain(guess)} />;
 }
 
 function MoveTrace({ moves }: { moves: Position[] }) {
@@ -116,7 +146,7 @@ function MoveTrace({ moves }: { moves: Position[] }) {
         const row = Math.floor(index / 5) - 2;
         const column = index % 5 - 2;
         const center = row === 0 && column === 0;
-        return <span key={index} className={`${center ? 'trace-center' : ''} ${observed.has(moveKey([row, column])) ? 'trace-observed' : ''}`}>{center ? <PieceFace label="?" tone="shadow" className="trace-center-piece" /> : null}</span>;
+        return <span key={index} className={`${center ? 'trace-center' : ''} ${observed.has(moveKey([row, column])) ? 'trace-observed' : ''}`}>{center ? <PieceFace label="?" tone="shadow" className="shogi-piece trace-center-piece" /> : null}</span>;
       })}
     </div>
   );
@@ -133,7 +163,12 @@ export function GameApp() {
   const [guessTarget, setGuessTarget] = useState<Piece | null>(null);
   const [promotionRequest, setPromotionRequest] = useState<PromotionRequest>(null);
   const [rulesOpen, setRulesOpen] = useState(false);
-  const shownGame = game ?? PREVIEW_GAME;
+  const [timeline, setTimeline] = useState<GameState[]>([]);
+  const [reviewIndex, setReviewIndex] = useState<number | null>(null);
+  const [revealOpponent, setRevealOpponent] = useState(false);
+  const [resultOpen, setResultOpen] = useState(false);
+  const reviewing = reviewIndex !== null;
+  const shownGame = reviewing ? timeline[reviewIndex] ?? game ?? PREVIEW_GAME : game ?? PREVIEW_GAME;
 
   const legalTargets = useMemo(() => {
     if (!game || phase !== 'playing' || !selection) return [];
@@ -160,18 +195,25 @@ export function GameApp() {
   }, [game, phase]);
 
   const startLocalMatch = useCallback(() => {
-    setGame(createInitialGame());
+    const initial = createInitialGame();
+    setGame(initial);
+    setTimeline([initial]);
     setViewer(HUMAN_SIDE);
     setGameMode('local');
     setCpuReport(null);
     setSelection(null);
     setGuessTarget(null);
     setPromotionRequest(null);
+    setReviewIndex(null);
+    setRevealOpponent(false);
+    setResultOpen(false);
     setPhase('playing');
   }, []);
 
   const startCpuMatch = useCallback((level: CpuLevel) => {
-    setGame(createInitialGame());
+    const initial = createInitialGame();
+    setGame(initial);
+    setTimeline([initial]);
     setViewer(HUMAN_SIDE);
     setGameMode('cpu');
     setCpuLevel(level);
@@ -179,6 +221,9 @@ export function GameApp() {
     setSelection(null);
     setGuessTarget(null);
     setPromotionRequest(null);
+    setReviewIndex(null);
+    setRevealOpponent(false);
+    setResultOpen(false);
     setPhase('playing');
   }, []);
 
@@ -233,6 +278,8 @@ export function GameApp() {
       }
       const next = applyCpuAction(game, decision.action);
       setGame(next);
+      setTimeline((current) => [...current, next]);
+      if (next.winner) setResultOpen(true);
       setPhase(next.winner ? 'finished' : 'playing');
     }, cpuLevel === 3 ? 520 : 680);
     return () => window.clearTimeout(timer);
@@ -246,15 +293,21 @@ export function GameApp() {
     setSelection(null);
     setGuessTarget(null);
     setPromotionRequest(null);
+    setTimeline([]);
+    setReviewIndex(null);
+    setRevealOpponent(false);
+    setResultOpen(false);
     setPhase('intro');
   }
 
   function completeMove(next: GameState) {
     setGame(next);
+    setTimeline((current) => [...current, next]);
     setSelection(null);
     setPromotionRequest(null);
     setGuessTarget(null);
     if (next.winner) {
+      setResultOpen(true);
       setPhase('finished');
     } else if (gameMode === 'cpu') {
       setViewer(HUMAN_SIDE);
@@ -314,8 +367,23 @@ export function GameApp() {
 
   function saveGuess(guess: GuessName) {
     if (!game || !guessTarget) return;
-    setGame(withGuess(game, guessTarget.id, guess));
+    const guessed = withGuess(game, guessTarget.id, guess);
+    setGame(guessed);
+    setTimeline((current) => current.length > 0 ? [...current.slice(0, -1), guessed] : current);
     setGuessTarget(null);
+  }
+
+  function openReview(moveNumber: number) {
+    if (gameMode !== 'cpu' || phase !== 'finished' || timeline.length === 0) return;
+    setReviewIndex(Math.max(0, Math.min(moveNumber, timeline.length - 1)));
+    if (!reviewing) setRevealOpponent(false);
+    setResultOpen(false);
+  }
+
+  function closeReview() {
+    setReviewIndex(null);
+    setRevealOpponent(false);
+    setResultOpen(true);
   }
 
   const opponent = otherSide(viewer);
@@ -325,10 +393,15 @@ export function GameApp() {
   const selectedText = selection?.kind === 'board'
     ? `${shownGame.board[selection.from[0]][selection.from[1]]?.name ?? ''}を選択中`
     : selection?.kind === 'hand' ? `${selection.name}を打つ場所を選択中` : '自分の駒を選んでください';
-  const latestActions = game?.moveHistory.slice(-2).reverse() ?? [];
+  const lastReviewIndex = Math.max(0, timeline.length - 1);
+  const currentReviewMove = reviewing ? shownGame.lastMove : null;
+  const canReview = gameMode === 'cpu' && phase === 'finished' && timeline.length > 0;
+  const resultTitle = gameMode === 'cpu'
+    ? game?.winner === HUMAN_SIDE ? 'あなたの勝ち' : 'あなたの負け'
+    : game?.winner ? `${sideLabel(game.winner)}の勝利` : '';
 
   return (
-    <main className={`game-page ${phase === 'handoff' ? 'handoff-active' : ''}`}>
+    <main className={`game-page ${phase === 'handoff' ? 'handoff-active' : ''} ${reviewing ? 'review-active' : ''}`}>
       <header className="topbar">
         <div className="brand-lockup"><span className="brand-piece">影</span><div><p className="brand-kicker">SHADOW SHOGI</p><h1>影将棋</h1></div></div>
         <p className="tagline">その一手が、正体を語る。</p>
@@ -359,8 +432,13 @@ export function GameApp() {
 
         <section className="board-column" aria-label="影将棋の盤面">
           <div className="captured-zone opponent-zone">
-            <div className="zone-heading"><div><span className="mini-piece">影</span><p><strong>{opponentLabel}</strong><small>持ち駒の種類は非公開</small></p></div><span className="shadow-count">合計 {handTotal(shownGame.hands[opponent])} 枚</span></div>
-            <div className="opponent-hand-hidden" aria-label={`相手の持ち駒は合計${handTotal(shownGame.hands[opponent])}枚。種類は非公開です。`}><ShieldQuestion /><span>相手の持ち駒は合計だけ表示されます</span></div>
+            <div className="zone-heading"><div><span className="mini-piece">影</span><p><strong>{opponentLabel}</strong><small>{reviewing && revealOpponent ? 'リプレイで正体を表示中' : '持ち駒の種類は非公開'}</small></p></div><span className="shadow-count">合計 {handTotal(shownGame.hands[opponent])} 枚</span></div>
+            {reviewing && revealOpponent ? (
+              <div className="review-opponent-hand" aria-label="相手の持ち駒の正体">
+                {HAND_NAMES.filter((name) => shownGame.hands[opponent][name] > 0).map((name) => <span className="review-hand-piece" key={name}><PieceFace label={name} tone="light" className="hand-piece-face enemy-piece" /><small>×{shownGame.hands[opponent][name]}</small></span>)}
+                {handTotal(shownGame.hands[opponent]) === 0 ? <span className="opponent-hand-empty">持ち駒なし</span> : null}
+              </div>
+            ) : <div className="opponent-hand-hidden" aria-label={`相手の持ち駒は合計${handTotal(shownGame.hands[opponent])}枚。種類は非公開です。`}><ShieldQuestion /><span>相手の持ち駒は合計だけ表示されます</span></div>}
           </div>
 
           <div className="board-frame">
@@ -374,16 +452,17 @@ export function GameApp() {
                 const selected = selection?.kind === 'board' && isSamePosition(selection.from, position);
                 const target = targetKeys.has(moveKey(position));
                 const last = shownGame.lastMove && (isSamePosition(shownGame.lastMove.to, position) || Boolean(shownGame.lastMove.from && isSamePosition(shownGame.lastMove.from, position)));
-                const label = piece ? (piece.side === viewer ? piece.name : `${displayName(shownGame.guesses[piece.id])}の予想`) : '空き升';
+                const label = piece ? (piece.side === viewer || revealOpponent ? piece.name : `${displayName(shownGame.guesses[piece.id])}の予想`) : '空き升';
                 return (
                   <button
                     className={`board-square ${selected ? 'selected-square' : ''} ${target ? 'legal-square' : ''} ${last ? 'last-square' : ''}`}
                     type="button"
+                    disabled={reviewing}
                     key={displayIndex}
                     onClick={() => clickSquare(position)}
                     aria-label={`${9 - position[1]}筋${position[0] + 1}段 ${label}`}
                   >
-                    {piece ? <PieceGlyph piece={piece} viewer={viewer} guess={shownGame.guesses[piece.id]} /> : null}
+                    {piece ? <PieceGlyph piece={piece} viewer={viewer} guess={shownGame.guesses[piece.id]} revealOpponent={reviewing && revealOpponent} /> : null}
                     {target ? <span className={`move-dot ${piece ? 'capture-dot' : ''}`} /> : null}
                   </button>
                 );
@@ -422,24 +501,33 @@ export function GameApp() {
               </div>
               <dl className="setup-list"><div><dt>盤面</dt><dd>9 × 9</dd></div><div><dt>初期配置</dt><dd>Swift版準拠</dd></div><div><dt>CPU処理</dt><dd>端末内で完結</dd></div></dl>
             </>
+          ) : reviewing ? (
+            <>
+              <p className="section-label">GAME REVIEW</p>
+              <h3>{reviewIndex}手目 / {lastReviewIndex}手</h3>
+              <p className="review-description">{currentReviewMove ? actionLogText(currentReviewMove, HUMAN_SIDE) : '対局開始時の配置です。'}</p>
+              <div className="review-controls" aria-label="棋譜の移動">
+                <div className="review-step-buttons">
+                  <button type="button" disabled={reviewIndex === 0} onClick={() => setReviewIndex(0)}>最初</button>
+                  <button type="button" disabled={reviewIndex === 0} onClick={() => setReviewIndex((current) => Math.max(0, (current ?? 0) - 1))}>前へ</button>
+                  <button type="button" disabled={reviewIndex === lastReviewIndex} onClick={() => setReviewIndex((current) => Math.min(lastReviewIndex, (current ?? 0) + 1))}>次へ</button>
+                  <button type="button" disabled={reviewIndex === lastReviewIndex} onClick={() => setReviewIndex(lastReviewIndex)}>最後</button>
+                </div>
+                <input type="range" min={0} max={lastReviewIndex} value={reviewIndex} onChange={(event) => setReviewIndex(Number(event.target.value))} aria-label="表示する手数" />
+                <button type="button" className={`reveal-toggle ${revealOpponent ? 'active' : ''}`} onClick={() => setRevealOpponent((visible) => !visible)}>
+                  {revealOpponent ? <EyeOff /> : <Eye />}
+                  <span><strong>{revealOpponent ? '相手の駒を影に戻す' : '相手の駒の正体を表示'}</strong><small>盤上と持ち駒を切り替え</small></span>
+                </button>
+                <Button variant="outline" className="review-result-button" onClick={closeReview}>対局結果に戻る</Button>
+              </div>
+              <ActivityLog state={shownGame} viewer={HUMAN_SIDE} onSelect={openReview} />
+            </>
           ) : (
             <>
               <p className="section-label">{gameMode === 'cpu' ? `${cpuLevelInfo.badge} CPU` : 'CURRENT TURN'}</p><h3>{phase === 'cpu-thinking' ? 'CPUが思考中' : `${playerLabel(game?.turn ?? viewer)}の手番`}</h3>
               <p>{phase === 'cpu-thinking' ? `${cpuLevelInfo.name}CPUが盤面を読んでいます。相手の駒はあなたには影のままです。` : '自分の駒を選ぶと移動可能な升が光ります。相手の影を選ぶと予想を記録できます。'}</p>
               {phase === 'cpu-thinking' ? <div className="cpu-thinking"><BrainCircuit /><span /><span /><span /></div> : null}
-              <div className="activity-card" aria-live="polite">
-                <div className="activity-heading"><Footprints /><strong>最新の行動</strong></div>
-                {latestActions.length > 0 ? (
-                  <ol className="activity-list">
-                    {latestActions.map((move, index) => (
-                      <li className={move.captured ? 'capture-activity' : ''} key={`${move.pieceId}-${game!.moveHistory.length - index}`}>
-                        <span>{game!.moveHistory.length - index}</span>
-                        <p>{actionLogText(move, viewer)}</p>
-                      </li>
-                    ))}
-                  </ol>
-                ) : <p className="activity-empty">まだ行動はありません</p>}
-              </div>
+              <ActivityLog state={shownGame} viewer={viewer} onSelect={canReview ? openReview : undefined} />
               {gameMode === 'cpu' && cpuReport ? <p className="cpu-report">前回の探索：深さ {cpuReport.depth}・{cpuReport.nodes.toLocaleString()}局面</p> : null}
               <button type="button" className="tip-card" onClick={() => setRulesOpen(true)}><CircleHelp /><span><strong>ルールを確認</strong><small>成り・持ち駒・二歩について</small></span></button>
             </>
@@ -478,10 +566,10 @@ export function GameApp() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={phase === 'finished' && Boolean(game?.winner)} onOpenChange={() => undefined}>
+      <Dialog open={phase === 'finished' && resultOpen && Boolean(game?.winner)} onOpenChange={() => undefined}>
         <DialogContent showCloseButton={false} className="result-dialog">
-          <span className="result-piece">王</span><DialogHeader><DialogTitle>{game?.winner ? `${gameMode === 'cpu' ? (game.winner === HUMAN_SIDE ? 'あなた' : 'CPU') : sideLabel(game.winner)}の勝利` : ''}</DialogTitle><DialogDescription>{gameMode === 'cpu' && game?.winner === CPU_SIDE ? 'あなたの王が影の中から見つかりました。' : '相手の王を捕らえました。'}</DialogDescription></DialogHeader>
-          <DialogFooter><Button variant="outline" onClick={resetToIntro}>タイトルへ</Button><Button onClick={() => gameMode === 'cpu' ? startCpuMatch(cpuLevel) : startLocalMatch()}>もう一局</Button></DialogFooter>
+          <span className="result-piece">王</span><DialogHeader><DialogTitle>{resultTitle}</DialogTitle><DialogDescription>{gameMode === 'cpu' && game?.winner === CPU_SIDE ? 'あなたの王が影の中から見つかりました。盤面を開いて、どの手で捕まったか確認できます。' : '相手の王を捕らえました。'}</DialogDescription></DialogHeader>
+          <DialogFooter><Button variant="outline" onClick={resetToIntro}>タイトルへ</Button>{gameMode === 'cpu' ? <Button variant="outline" onClick={() => openReview(lastReviewIndex)}><Footprints /> 盤面で振り返る</Button> : null}<Button onClick={() => gameMode === 'cpu' ? startCpuMatch(cpuLevel) : startLocalMatch()}>もう一局</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
