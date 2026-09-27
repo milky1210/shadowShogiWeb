@@ -90,7 +90,7 @@ function actionLogText(move: GameState['moveHistory'][number], viewer: Side) {
     : `相手が${destination}へ移動した`;
 }
 
-function ActivityLog({ state, viewer, onSelect }: { state: GameState; viewer: Side; onSelect?: (moveNumber: number) => void }) {
+function ActivityLog({ state, viewer, onOpenHistory }: { state: GameState; viewer: Side; onOpenHistory?: () => void }) {
   const actions = state.moveHistory.slice(-2);
   const firstMoveNumber = state.moveHistory.length - actions.length + 1;
 
@@ -98,7 +98,7 @@ function ActivityLog({ state, viewer, onSelect }: { state: GameState; viewer: Si
     <div className="activity-card" aria-live="polite">
       <div className="activity-heading">
         <span><Footprints /><strong>最新の行動</strong></span>
-        {onSelect ? <small>タップで局面へ</small> : null}
+        {onOpenHistory ? <small>タップで全履歴</small> : null}
       </div>
       {actions.length > 0 ? (
         <ol className="activity-list">
@@ -106,7 +106,7 @@ function ActivityLog({ state, viewer, onSelect }: { state: GameState; viewer: Si
             const moveNumber = firstMoveNumber + index;
             return (
               <li className={move.captured ? 'capture-activity' : ''} key={`${move.pieceId}-${moveNumber}`}>
-                <button type="button" disabled={!onSelect} onClick={() => onSelect?.(moveNumber)}>
+                <button type="button" disabled={!onOpenHistory} onClick={onOpenHistory}>
                   <span>{moveNumber}</span>
                   <p>{actionLogText(move, viewer)}</p>
                 </button>
@@ -167,6 +167,7 @@ export function GameApp() {
   const [reviewIndex, setReviewIndex] = useState<number | null>(null);
   const [revealOpponent, setRevealOpponent] = useState(false);
   const [resultOpen, setResultOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const reviewing = reviewIndex !== null;
   const shownGame = reviewing ? timeline[reviewIndex] ?? game ?? PREVIEW_GAME : game ?? PREVIEW_GAME;
 
@@ -207,6 +208,7 @@ export function GameApp() {
     setReviewIndex(null);
     setRevealOpponent(false);
     setResultOpen(false);
+    setHistoryOpen(false);
     setPhase('playing');
   }, []);
 
@@ -224,6 +226,7 @@ export function GameApp() {
     setReviewIndex(null);
     setRevealOpponent(false);
     setResultOpen(false);
+    setHistoryOpen(false);
     setPhase('playing');
   }, []);
 
@@ -297,6 +300,7 @@ export function GameApp() {
     setReviewIndex(null);
     setRevealOpponent(false);
     setResultOpen(false);
+    setHistoryOpen(false);
     setPhase('intro');
   }
 
@@ -378,6 +382,12 @@ export function GameApp() {
     setReviewIndex(Math.max(0, Math.min(moveNumber, timeline.length - 1)));
     if (!reviewing) setRevealOpponent(false);
     setResultOpen(false);
+  }
+
+  function selectHistoryMove(moveNumber: number) {
+    if (gameMode !== 'cpu' || phase !== 'finished') return;
+    openReview(moveNumber);
+    setHistoryOpen(false);
   }
 
   function closeReview() {
@@ -471,6 +481,26 @@ export function GameApp() {
             <span className="rank-labels" aria-hidden="true">一 二 三 四 五 六 七 八 九</span>
           </div>
 
+          {reviewing ? (
+            <section className="replay-dock" aria-label="棋譜の振り返り操作">
+              <div className="replay-dock-heading"><span>対局を振り返る</span><strong>{reviewIndex} / {lastReviewIndex}手</strong></div>
+              <div className="review-step-buttons">
+                <button type="button" disabled={reviewIndex === 0} onClick={() => setReviewIndex(0)}>最初</button>
+                <button type="button" disabled={reviewIndex === 0} onClick={() => setReviewIndex((current) => Math.max(0, (current ?? 0) - 1))}>前へ</button>
+                <button type="button" disabled={reviewIndex === lastReviewIndex} onClick={() => setReviewIndex((current) => Math.min(lastReviewIndex, (current ?? 0) + 1))}>次へ</button>
+                <button type="button" disabled={reviewIndex === lastReviewIndex} onClick={() => setReviewIndex(lastReviewIndex)}>最後</button>
+              </div>
+              <div className="replay-slider-row"><span>0</span><input type="range" min={0} max={lastReviewIndex} value={reviewIndex} onChange={(event) => setReviewIndex(Number(event.target.value))} aria-label="表示する手数" /><span>{lastReviewIndex}</span></div>
+              <div className="replay-dock-actions">
+                <button type="button" className={`reveal-toggle ${revealOpponent ? 'active' : ''}`} onClick={() => setRevealOpponent((visible) => !visible)}>
+                  {revealOpponent ? <EyeOff /> : <Eye />}
+                  <span><strong>{revealOpponent ? '相手の駒を影に戻す' : '相手の駒の正体を表示'}</strong><small>盤上と持ち駒を切り替え</small></span>
+                </button>
+                <Button variant="outline" className="review-result-button" onClick={closeReview}>対局結果に戻る</Button>
+              </div>
+            </section>
+          ) : null}
+
           <div className="captured-zone own-zone">
             <div className="zone-heading"><div><span className="mini-piece gold">王</span><p><strong>{sideLabel(viewer)}・あなた</strong><small>{phase === 'playing' ? selectedText : phase === 'cpu-thinking' ? 'CPUが次の一手を探索中' : '手番を待っています'}</small></p></div><span className="turn-pill">{phase === 'playing' ? '手番' : phase === 'cpu-thinking' ? '思考中' : '待機'}</span></div>
             <div className="hand-list" aria-label="持ち駒">
@@ -506,28 +536,14 @@ export function GameApp() {
               <p className="section-label">GAME REVIEW</p>
               <h3>{reviewIndex}手目 / {lastReviewIndex}手</h3>
               <p className="review-description">{currentReviewMove ? actionLogText(currentReviewMove, HUMAN_SIDE) : '対局開始時の配置です。'}</p>
-              <div className="review-controls" aria-label="棋譜の移動">
-                <div className="review-step-buttons">
-                  <button type="button" disabled={reviewIndex === 0} onClick={() => setReviewIndex(0)}>最初</button>
-                  <button type="button" disabled={reviewIndex === 0} onClick={() => setReviewIndex((current) => Math.max(0, (current ?? 0) - 1))}>前へ</button>
-                  <button type="button" disabled={reviewIndex === lastReviewIndex} onClick={() => setReviewIndex((current) => Math.min(lastReviewIndex, (current ?? 0) + 1))}>次へ</button>
-                  <button type="button" disabled={reviewIndex === lastReviewIndex} onClick={() => setReviewIndex(lastReviewIndex)}>最後</button>
-                </div>
-                <input type="range" min={0} max={lastReviewIndex} value={reviewIndex} onChange={(event) => setReviewIndex(Number(event.target.value))} aria-label="表示する手数" />
-                <button type="button" className={`reveal-toggle ${revealOpponent ? 'active' : ''}`} onClick={() => setRevealOpponent((visible) => !visible)}>
-                  {revealOpponent ? <EyeOff /> : <Eye />}
-                  <span><strong>{revealOpponent ? '相手の駒を影に戻す' : '相手の駒の正体を表示'}</strong><small>盤上と持ち駒を切り替え</small></span>
-                </button>
-                <Button variant="outline" className="review-result-button" onClick={closeReview}>対局結果に戻る</Button>
-              </div>
-              <ActivityLog state={shownGame} viewer={HUMAN_SIDE} onSelect={openReview} />
+              <ActivityLog state={shownGame} viewer={HUMAN_SIDE} onOpenHistory={() => setHistoryOpen(true)} />
             </>
           ) : (
             <>
               <p className="section-label">{gameMode === 'cpu' ? `${cpuLevelInfo.badge} CPU` : 'CURRENT TURN'}</p><h3>{phase === 'cpu-thinking' ? 'CPUが思考中' : `${playerLabel(game?.turn ?? viewer)}の手番`}</h3>
               <p>{phase === 'cpu-thinking' ? `${cpuLevelInfo.name}CPUが盤面を読んでいます。相手の駒はあなたには影のままです。` : '自分の駒を選ぶと移動可能な升が光ります。相手の影を選ぶと予想を記録できます。'}</p>
               {gameMode === 'cpu' ? <div className={`cpu-thinking ${phase === 'cpu-thinking' ? 'is-active' : ''}`} aria-hidden={phase !== 'cpu-thinking'}><BrainCircuit /><span /><span /><span /></div> : null}
-              <ActivityLog state={shownGame} viewer={viewer} onSelect={canReview ? openReview : undefined} />
+              <ActivityLog state={shownGame} viewer={viewer} onOpenHistory={() => setHistoryOpen(true)} />
               {gameMode === 'cpu' ? <p className={`cpu-report ${cpuReport ? 'is-active' : ''}`} aria-hidden={!cpuReport}>{cpuReport ? `前回の探索：深さ ${cpuReport.depth}・${cpuReport.nodes.toLocaleString()}局面` : '探索結果の表示領域'}</p> : null}
               <button type="button" className="tip-card" onClick={() => setRulesOpen(true)}><CircleHelp /><span><strong>ルールを確認</strong><small>成り・持ち駒・二歩について</small></span></button>
             </>
@@ -563,6 +579,25 @@ export function GameApp() {
         <DialogContent showCloseButton={false} className="promotion-dialog">
           <DialogHeader><DialogTitle>成りますか？</DialogTitle><DialogDescription>この手は敵陣に入るか、敵陣から出る手です。</DialogDescription></DialogHeader>
           <DialogFooter><Button variant="outline" onClick={() => promotionRequest && commitBoardMove(promotionRequest.from, promotionRequest.to, false)}>成らない</Button><Button onClick={() => promotionRequest && commitBoardMove(promotionRequest.from, promotionRequest.to, true)}>成る</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+        <DialogContent className="history-dialog sm:max-w-lg">
+          <DialogHeader><DialogTitle>この対局の行動ログ</DialogTitle><DialogDescription>{canReview ? '確認したい手を選ぶと、その時点の盤面へ移動します。' : 'この対局で指された手を、最初から順番に確認できます。'}</DialogDescription></DialogHeader>
+          <div className="full-history-list" aria-label="全対局ログ">
+            {game && game.moveHistory.length > 0 ? game.moveHistory.map((move, index) => {
+              const moveNumber = index + 1;
+              const coordinates = move.from ? `${boardCoordinates(move.from)} → ${boardCoordinates(move.to)}` : `${boardCoordinates(move.to)} 打`;
+              return (
+                <button type="button" className={reviewing && reviewIndex === moveNumber ? 'active' : ''} disabled={!canReview} key={`${move.pieceId}-${moveNumber}`} onClick={() => selectHistoryMove(moveNumber)}>
+                  <span className="history-move-number">{moveNumber}</span>
+                  <span className="history-move-copy"><strong>{actionLogText(move, gameMode === 'cpu' ? HUMAN_SIDE : viewer)}</strong><small>{playerLabel(move.side)}・{coordinates}</small></span>
+                </button>
+              );
+            }) : <p className="history-empty">まだ行動はありません</p>}
+          </div>
+          <DialogFooter><Button onClick={() => setHistoryOpen(false)}>閉じる</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
