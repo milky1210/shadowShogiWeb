@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bot, BookOpen, BrainCircuit, CircleHelp, Eye, EyeOff, Footprints, RotateCcw, ShieldQuestion, Users } from 'lucide-react';
+import { Bot, BookOpen, BrainCircuit, CircleHelp, Eye, EyeOff, Footprints, Gamepad2, Globe2, RotateCcw, ShieldQuestion, Sparkles, Swords, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -39,6 +39,7 @@ import { applyCpuAction, chooseCpuAction, type CpuLevel } from '@/lib/shadow-sho
 
 type Phase = 'intro' | 'playing' | 'handoff' | 'cpu-thinking' | 'finished';
 type GameMode = 'local' | 'cpu';
+type MatchSelection = 'local' | 'online' | 'cpu-1' | 'cpu-2' | 'cpu-3';
 type Selection = { kind: 'board'; from: Position } | { kind: 'hand'; name: HandPieceName } | null;
 type PromotionRequest = { from: Position; to: Position } | null;
 
@@ -54,9 +55,9 @@ const PREVIEW_GAME = createInitialGame(seededRandom(20260926));
 const HUMAN_SIDE: Side = 2;
 const CPU_SIDE: Side = 1;
 const CPU_LEVELS: Array<{ level: CpuLevel; name: string; badge: string; description: string }> = [
-  { level: 1, name: '初級', badge: 'GREEDY', description: '取れる影があれば取る。なければ気まぐれ。' },
-  { level: 2, name: '中級', badge: 'READER', description: '見えた動きを読み、危険と前進を評価する。' },
-  { level: 3, name: '最強', badge: 'OMNISCIENT', description: '全配置を理解し、完全情報で先を読む。' },
+  { level: 1, name: 'あゆむくん', badge: 'BEGINNER', description: '取れる影を素直に狙う、親しみやすい棋士。' },
+  { level: 2, name: '銀次くん', badge: 'TACTICIAN', description: '見えた動きを読み、危険と前進を評価する。' },
+  { level: 3, name: '影丸', badge: 'MASTER', description: '全配置を理解し、完全情報で先を読む。' },
 ];
 function moveKey([row, column]: Position) {
   return `${row}-${column}`;
@@ -168,6 +169,7 @@ export function GameApp() {
   const [revealOpponent, setRevealOpponent] = useState(false);
   const [resultOpen, setResultOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [matchSelection, setMatchSelection] = useState<MatchSelection>('local');
   const reviewing = reviewIndex !== null;
   const shownGame = reviewing ? timeline[reviewIndex] ?? game ?? PREVIEW_GAME : game ?? PREVIEW_GAME;
 
@@ -301,6 +303,7 @@ export function GameApp() {
     setRevealOpponent(false);
     setResultOpen(false);
     setHistoryOpen(false);
+    setMatchSelection('local');
     setPhase('intro');
   }
 
@@ -396,6 +399,15 @@ export function GameApp() {
     setResultOpen(true);
   }
 
+  function startSelectedMatch() {
+    if (matchSelection === 'local') {
+      startLocalMatch();
+      return;
+    }
+    if (matchSelection === 'online') return;
+    startCpuMatch(Number(matchSelection.slice(-1)) as CpuLevel);
+  }
+
   const opponent = otherSide(viewer);
   const cpuLevelInfo = CPU_LEVELS.find((item) => item.level === cpuLevel) ?? CPU_LEVELS[1];
   const playerLabel = (side: Side) => gameMode === 'cpu' && side === CPU_SIDE ? 'CPU' : sideLabel(side);
@@ -409,6 +421,18 @@ export function GameApp() {
   const resultTitle = gameMode === 'cpu'
     ? game?.winner === HUMAN_SIDE ? 'あなたの勝ち' : 'あなたの負け'
     : game?.winner ? `${sideLabel(game.winner)}の勝利` : '';
+  const selectedCpuLevel = matchSelection.startsWith('cpu-') ? Number(matchSelection.slice(-1)) as CpuLevel : null;
+  const selectedCpu = selectedCpuLevel ? CPU_LEVELS.find((item) => item.level === selectedCpuLevel) ?? null : null;
+  const homeTitle = matchSelection === 'local'
+    ? '同じ盤を、ふたりで囲む。'
+    : matchSelection === 'online'
+      ? '遠くの影と、つながる。'
+      : `${selectedCpu?.name ?? ''}に挑む。`;
+  const homeDescription = matchSelection === 'local'
+    ? '一台の端末を手渡しながら遊ぶ、影将棋の基本対局。'
+    : matchSelection === 'online'
+      ? 'ネット対戦は準備中です。今後のアップデートで解放されます。'
+      : selectedCpu?.description ?? '';
 
   return (
     <main className={`game-page ${phase === 'handoff' ? 'handoff-active' : ''} ${reviewing ? 'review-active' : ''}`}>
@@ -421,7 +445,54 @@ export function GameApp() {
         </nav>
       </header>
 
-      <section className="game-stage" aria-hidden={phase === 'handoff'}>
+      <section className={`game-stage ${phase === 'intro' ? 'home-stage' : ''}`} aria-hidden={phase === 'handoff'}>
+        {phase === 'intro' ? (
+          <section className="home-screen" aria-label="対局方法の選択">
+            <div className="home-selection-visual" key={matchSelection}>
+              <div className="home-visual-glow" />
+              {selectedCpu ? <div className={`home-character portrait-${selectedCpu.level}`} aria-hidden="true" /> : (
+                <div className={`home-mode-visual ${matchSelection === 'online' ? 'online' : ''}`} aria-hidden="true">
+                  <span className="home-mode-ring" />
+                  {matchSelection === 'online' ? <Globe2 /> : <Users />}
+                  <i className="home-orbit-piece">影</i>
+                </div>
+              )}
+              <div className="home-visual-copy">
+                <p className="section-label">SELECT YOUR MATCH</p>
+                <span className="home-visual-badge">{selectedCpu?.badge ?? (matchSelection === 'online' ? 'COMING SOON' : 'LOCAL MATCH')}</span>
+                <h2>{homeTitle}</h2>
+                <p>{homeDescription}</p>
+              </div>
+            </div>
+
+            <div className="home-menu-row home-local-row" aria-label="二人対局">
+              <button type="button" className={matchSelection === 'local' ? 'selected' : ''} aria-pressed={matchSelection === 'local'} onClick={() => setMatchSelection('local')}>
+                <span className="home-option-icon"><Users /></span><span><strong>二人対局</strong><small>ローカル</small></span>
+              </button>
+              <button type="button" className={matchSelection === 'online' ? 'selected' : ''} aria-pressed={matchSelection === 'online'} onClick={() => setMatchSelection('online')}>
+                <span className="home-option-icon"><Globe2 /></span><span><strong>二人対局</strong><small>ネット対戦・準備中</small></span>
+              </button>
+            </div>
+
+            <div className="home-menu-row home-cpu-row" aria-label="CPU対局">
+              {CPU_LEVELS.map((item) => {
+                const value = `cpu-${item.level}` as MatchSelection;
+                return (
+                  <button type="button" className={matchSelection === value ? 'selected' : ''} aria-pressed={matchSelection === value} key={item.level} onClick={() => setMatchSelection(value)}>
+                    <span className={`home-cpu-avatar portrait-${item.level}`} aria-hidden="true" />
+                    <span><small>CPU対局</small><strong>vs {item.name}</strong></span>
+                    <em>LV.{item.level}</em>
+                  </button>
+                );
+              })}
+            </div>
+
+            <Button className="home-start-button" disabled={matchSelection === 'online'} onClick={startSelectedMatch}>
+              {matchSelection === 'online' ? <><Sparkles /> ネット対戦は準備中</> : <><Swords /> この対局を開始</>}
+            </Button>
+            <p className="home-footnote"><Gamepad2 /> 対局処理はすべてこの端末内で動作します</p>
+          </section>
+        ) : null}
         <aside className="side-panel intro-panel">
           <p className="section-label">SHADOW TACTICS</p>
           <h2>影を読み、<br />王を探せ。</h2>
