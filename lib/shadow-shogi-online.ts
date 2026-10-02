@@ -17,7 +17,11 @@ import {
   update,
   type Unsubscribe,
 } from 'firebase/database';
-import { firebaseAuth, firebaseDatabase } from './firebase.ts';
+import {
+  assertFirebaseConfigured,
+  firebaseAuth,
+  firebaseDatabase,
+} from './firebase.ts';
 import { normalizeRoomCode } from './shadow-shogi-room.ts';
 import {
   applyBoardMove,
@@ -299,6 +303,7 @@ export function decodeOnlineRoom(value: unknown): OnlineRoom | null {
 let sessionRequest: Promise<User> | null = null;
 
 async function assertOnlineEnabled() {
+  assertFirebaseConfigured();
   const snapshot = await get(ref(firebaseDatabase, 'config/onlineEnabled'));
   if (snapshot.val() === false) throw new Error(ONLINE_DISABLED_MESSAGE);
 }

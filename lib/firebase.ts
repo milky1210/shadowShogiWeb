@@ -8,14 +8,16 @@ import { getDatabase } from 'firebase/database';
 
 const firebaseApiKey = import.meta.env?.VITE_FIREBASE_API_KEY;
 
-if (!firebaseApiKey) {
-  throw new Error(
-    'VITE_FIREBASE_API_KEY is required when online play is opened.',
-  );
+export function assertFirebaseConfigured() {
+  if (!firebaseApiKey) {
+    throw new Error(
+      'オンライン対局のFirebase設定が不足しています。管理者へ連絡してください。',
+    );
+  }
 }
 
 const firebaseConfig = {
-  apiKey: firebaseApiKey,
+  apiKey: firebaseApiKey || 'missing-firebase-api-key',
   authDomain: 'shadowshogi.firebaseapp.com',
   databaseURL:
     'https://shadowshogi-default-rtdb.asia-southeast1.firebasedatabase.app',

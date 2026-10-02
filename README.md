@@ -2,7 +2,7 @@
 
 Swift版 `shadowShogi` のWeb移植版です。ローカル二人対局、3段階のCPU対局、Firebaseを使ったオンライン二人対局を遊べます。
 
-本番URLは `https://shadow-shogi.rays-dev.com` を予定しています。静的ファイルはCloudflare Pages、オンライン対局だけFirebase Spark、既存のChatGPT Sites版はバックアップとして残す構成です。
+本番URLは `https://shadow-shogi.rays-dev.com` です。静的ファイルはCloudflare Pages、オンライン対局だけFirebase Spark、既存のChatGPT Sites版はバックアップとして残す構成です。
 
 ## 構成
 
@@ -50,7 +50,15 @@ npm run test:e2e
 
 ## デプロイ
 
-Cloudflare Pagesへ静的サイトをデプロイ:
+`main` ブランチへpushすると、GitHub Actionsがlint・テスト・ビルドを通した後、Cloudflare Pagesの `shadow-shogi` プロジェクトへ自動デプロイします。Pull Requestでは検証だけを行います。
+
+GitHubリポジトリには、Actions用の次のRepository secretsを登録します。値をソースコードへ保存しないでください。
+
+- `CLOUDFLARE_ACCOUNT_ID`: CloudflareアカウントID
+- `CLOUDFLARE_API_TOKEN`: 対象アカウントのCloudflare Pages編集権限だけを持つAPIトークン
+- `VITE_FIREBASE_API_KEY`: Firebase関連APIだけに制限したWeb APIキー
+
+手元からCloudflare Pagesへ静的サイトをデプロイすることもできます:
 
 ```bash
 npm run deploy:cloudflare
