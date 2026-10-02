@@ -105,7 +105,7 @@ button {
   place-items: center;
   color: #1b2427;
   background: linear-gradient(155deg, #d6ad65, #9c6e35);
-  clip-path: polygon(50% 0, 94% 19%, 85% 100%, 15% 100%, 6% 19%);
+  clip-path: polygon(50% 0, 84% 19%, 96% 100%, 4% 100%, 16% 19%);
   font-family: 'Yu Mincho', 'Hiragino Mincho ProN', serif;
   font-weight: 800;
 }
@@ -331,7 +331,7 @@ button {
   height: 38px;
   display: grid;
   place-items: center;
-  clip-path: polygon(50% 0, 94% 19%, 85% 100%, 15% 100%, 6% 19%);
+  clip-path: polygon(50% 0, 84% 19%, 96% 100%, 4% 100%, 16% 19%);
   background: #b98c4d;
   color: #102027;
   font-family: 'Yu Mincho', serif;
@@ -801,7 +801,7 @@ button {
   display: grid;
   place-items: center;
   overflow: hidden;
-  clip-path: polygon(50% 0, 94% 19%, 87% 100%, 13% 100%, 6% 19%);
+  clip-path: polygon(50% 0, 84% 19%, 96% 100%, 4% 100%, 16% 19%);
   background: var(--piece-edge);
   color: var(--piece-ink);
   font-family: 'Yu Mincho', 'Hiragino Mincho ProN', serif;
