@@ -953,7 +953,6 @@ export function GameApp() {
 
   function openReview(moveNumber: number) {
     if (
-      (gameMode !== 'cpu' && gameMode !== 'online') ||
       phase !== 'finished' ||
       timeline.length === 0
     )
@@ -964,11 +963,7 @@ export function GameApp() {
   }
 
   function selectHistoryMove(moveNumber: number) {
-    if (
-      (gameMode !== 'cpu' && gameMode !== 'online') ||
-      phase !== 'finished'
-    )
-      return;
+    if (phase !== 'finished') return;
     openReview(moveNumber);
     setHistoryOpen(false);
   }
@@ -1126,7 +1121,6 @@ export function GameApp() {
   const lastReviewIndex = Math.max(0, timeline.length - 1);
   const currentReviewMove = reviewing ? shownGame.lastMove : null;
   const canReview =
-    (gameMode === 'cpu' || gameMode === 'online') &&
     phase === 'finished' &&
     timeline.length > 0;
   const resultTitle =
