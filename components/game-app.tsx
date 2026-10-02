@@ -388,6 +388,7 @@ export function GameApp() {
   const [cpuLevel, setCpuLevel] = useState<CpuLevel>(2);
   const [humanSide, setHumanSide] = useState<Side>(2);
   const [selection, setSelection] = useState<Selection>(null);
+  const selectionRef = useRef<Selection>(null);
   const [guessTarget, setGuessTarget] = useState<Piece | null>(null);
   const [promotionRequest, setPromotionRequest] =
     useState<PromotionRequest>(null);
@@ -430,11 +431,15 @@ export function GameApp() {
   const markAppReady = useCallback((node: HTMLElement | null) => {
     if (node) node.dataset.appReady = 'true';
   }, []);
+  const updateSelection = useCallback((next: Selection) => {
+    selectionRef.current = next;
+    setSelection(next);
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setSelection(null);
+        updateSelection(null);
         setGuessTarget(null);
         setPromotionRequest(null);
       }
@@ -445,7 +450,7 @@ export function GameApp() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [game, phase]);
+  }, [game, phase, updateSelection]);
 
   const startLocalMatch = useCallback(() => {
     const initial = createInitialGame();
@@ -454,7 +459,7 @@ export function GameApp() {
     setTimeline([initial]);
     setViewer(2);
     setGameMode('local');
-    setSelection(null);
+    updateSelection(null);
     setGuessTarget(null);
     setPromotionRequest(null);
     setReviewIndex(null);
@@ -463,7 +468,7 @@ export function GameApp() {
     setHistoryOpen(false);
     setShareFeedback('');
     setPhase('playing');
-  }, []);
+  }, [updateSelection]);
 
   const startCpuMatch = useCallback((level: CpuLevel) => {
     preloadCpuPortrait(level);
@@ -477,7 +482,7 @@ export function GameApp() {
     setViewer(nextHumanSide);
     setGameMode('cpu');
     setCpuLevel(level);
-    setSelection(null);
+    updateSelection(null);
     setGuessTarget(null);
     setPromotionRequest(null);
     setReviewIndex(null);
@@ -486,7 +491,7 @@ export function GameApp() {
     setHistoryOpen(false);
     setShareFeedback('');
     setPhase(initial.turn === nextHumanSide ? 'playing' : 'cpu-thinking');
-  }, []);
+  }, [updateSelection]);
 
   const applyOnlineRoomState = useCallback((room: OnlineRoom, uid: string) => {
     const side =
@@ -507,7 +512,7 @@ export function GameApp() {
     setGame(gameWithLocalGuesses);
     setViewer(side);
     setGameMode('online');
-    setSelection(null);
+    updateSelection(null);
     setPromotionRequest(null);
     setTimeline(
       room.timeline.map((snapshot, index) =>
@@ -525,7 +530,7 @@ export function GameApp() {
     } else {
       setPhase(room.game.turn === side ? 'playing' : 'online-waiting');
     }
-  }, []);
+  }, [updateSelection]);
 
   const startOnlineMatch = useCallback(async () => {
     setOnlineBusy(true);
@@ -782,7 +787,7 @@ export function GameApp() {
     setHumanSide(2);
     setViewer(2);
     setGameMode('local');
-    setSelection(null);
+    updateSelection(null);
     setGuessTarget(null);
     setPromotionRequest(null);
     setTimeline([]);
@@ -807,7 +812,7 @@ export function GameApp() {
   async function completeMove(next: GameState) {
     setGame(next);
     setTimeline((current) => [...current, next]);
-    setSelection(null);
+    updateSelection(null);
     setPromotionRequest(null);
     setGuessTarget(null);
     if (gameMode === 'online') {
@@ -855,6 +860,7 @@ export function GameApp() {
   function clickSquare(position: Position) {
     if (!game) return;
     const piece = game.board[position[0]][position[1]];
+    const activeSelection = selectionRef.current;
     const canPlay = phase === 'playing' && viewer === game.turn;
     const canInspectWhileWaiting =
       (gameMode === 'cpu' && phase === 'cpu-thinking') ||
@@ -864,35 +870,46 @@ export function GameApp() {
         setGuessTarget(piece);
       return;
     }
-    const legalTarget = targetKeys.has(moveKey(position));
+    const legalTarget = activeSelection
+      ? (activeSelection.kind === 'board'
+          ? getLegalMoves(game, activeSelection.from)
+          : getDropTargets(game, activeSelection.name, game.turn)
+        ).some((target) => isSamePosition(target, position))
+      : false;
 
-    if (selection && legalTarget) {
-      if (selection.kind === 'hand') {
-        void completeMove(applyDrop(game, selection.name, position));
+    if (activeSelection && legalTarget) {
+      if (activeSelection.kind === 'hand') {
+        void completeMove(applyDrop(game, activeSelection.name, position));
         return;
       }
-      const movingPiece = game.board[selection.from[0]][selection.from[1]];
+      const movingPiece =
+        game.board[activeSelection.from[0]][activeSelection.from[1]];
       if (!movingPiece) return;
       if (mustPromote(movingPiece.name, movingPiece.side, position)) {
-        commitBoardMove(selection.from, position, true);
+        commitBoardMove(activeSelection.from, position, true);
       } else if (
-        canPromote(movingPiece.name, movingPiece.side, selection.from, position)
+        canPromote(
+          movingPiece.name,
+          movingPiece.side,
+          activeSelection.from,
+          position,
+        )
       ) {
-        setPromotionRequest({ from: selection.from, to: position });
+        setPromotionRequest({ from: activeSelection.from, to: position });
       } else {
-        commitBoardMove(selection.from, position, false);
+        commitBoardMove(activeSelection.from, position, false);
       }
       return;
     }
 
     if (piece?.side === viewer) {
       if (
-        selection?.kind === 'board' &&
-        isSamePosition(selection.from, position)
+        activeSelection?.kind === 'board' &&
+        isSamePosition(activeSelection.from, position)
       ) {
-        setSelection(null);
+        updateSelection(null);
       } else {
-        setSelection({ kind: 'board', from: position });
+        updateSelection({ kind: 'board', from: position });
       }
       return;
     }
@@ -900,7 +917,7 @@ export function GameApp() {
       setGuessTarget(piece);
       return;
     }
-    setSelection(null);
+    updateSelection(null);
   }
 
   function selectHand(name: HandPieceName) {
@@ -911,9 +928,12 @@ export function GameApp() {
       game.hands[viewer][name] < 1
     )
       return;
-    if (selection?.kind === 'hand' && selection.name === name)
-      setSelection(null);
-    else setSelection({ kind: 'hand', name });
+    if (
+      selectionRef.current?.kind === 'hand' &&
+      selectionRef.current.name === name
+    )
+      updateSelection(null);
+    else updateSelection({ kind: 'hand', name });
   }
 
   function saveGuess(guess: GuessName) {
