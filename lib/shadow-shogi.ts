@@ -21,6 +21,7 @@ export interface MoveRecord {
   to: Position;
   side: Side;
   pieceId: number;
+  pieceName: PieceName;
   captured: PieceName | null;
   promoted: boolean;
   dropped: boolean;
@@ -53,6 +54,10 @@ const KING_STEPS: Position[] = [[-1, 0], [-1, 1], [-1, -1], [0, 1], [0, -1], [1,
 
 export function otherSide(side: Side): Side {
   return side === 1 ? 2 : 1;
+}
+
+export function randomSide(random: () => number = Math.random): Side {
+  return random() < 0.5 ? 1 : 2;
 }
 
 export function sideLabel(side: Side): string {
@@ -302,6 +307,7 @@ export function applyBoardMove(state: GameState, from: Position, to: Position, p
     to: [...to] as Position,
     side: piece.side,
     pieceId: piece.id,
+    pieceName: originalName,
     captured: captured?.name ?? null,
     promoted: originalName !== piece.name,
     dropped: false,
@@ -320,7 +326,7 @@ export function applyDrop(state: GameState, name: HandPieceName, to: Position): 
   const piece: Piece = { id: ++next.latestId, name, side: next.turn };
   next.board[to[0]][to[1]] = piece;
   next.hands[next.turn][name] -= 1;
-  const record: MoveRecord = { from: null, to: [...to] as Position, side: next.turn, pieceId: piece.id, captured: null, promoted: false, dropped: true };
+  const record: MoveRecord = { from: null, to: [...to] as Position, side: next.turn, pieceId: piece.id, pieceName: name, captured: null, promoted: false, dropped: true };
   next.lastMove = record;
   next.moveHistory.push(record);
   next.turn = otherSide(next.turn);

@@ -116,6 +116,25 @@ function findKing(state: GameState, side: Side): Position | null {
   return null;
 }
 
+function isKingUnderImmediateThreat(state: GameState, side: Side): boolean {
+  const king = findKing(state, side);
+  if (!king) return false;
+  const enemy = side === 1 ? 2 : 1;
+
+  for (let row = 0; row < 9; row += 1) {
+    for (let column = 0; column < 9; column += 1) {
+      const piece = state.board[row][column];
+      if (!piece || piece.side !== enemy) continue;
+      if (getLegalMoves(state, [row, column]).some((target) => samePosition(target, king))) return true;
+    }
+  }
+  return false;
+}
+
+function safeKingResponses(state: GameState, actions: CpuAction[], side: Side): CpuAction[] {
+  return actions.filter((action) => !isKingUnderImmediateThreat(applyCpuAction(state, action), side));
+}
+
 function evaluateState(state: GameState, perspective: Side): number {
   if (state.winner) return state.winner === perspective ? WIN_SCORE : -WIN_SCORE;
   let score = 0;
@@ -144,68 +163,161 @@ function evaluateState(state: GameState, perspective: Side): number {
   return score;
 }
 
-function observedDanger(state: GameState, position: Position, cpuSide: Side): number {
-  const enemy = cpuSide === 1 ? 2 : 1;
-  let danger = 0;
-  for (let row = 0; row < 9; row += 1) {
-    for (let column = 0; column < 9; column += 1) {
-      const piece = state.board[row][column];
-      if (!piece || piece.side !== enemy) continue;
-      const distance = Math.abs(position[0] - row) + Math.abs(position[1] - column);
-      if (distance <= 1) danger += 1;
-      const observedMoves = state.moveLogs[piece.id] ?? [];
-      if (observedMoves.some(([rowDelta, columnDelta]) => samePosition([row + rowDelta, column + columnDelta], position))) danger += 2;
-    }
-  }
-  return danger;
-}
-
-function mediumScore(state: GameState, action: CpuAction, cpuSide: Side): number {
-  const destination = action.to;
-  const capturedShadow = actionCapture(state, action) !== null;
-  const movingName = action.kind === 'move'
-    ? state.board[action.from[0]][action.from[1]]?.name ?? '歩'
-    : action.name;
-  const forwardProgress = cpuSide === 1 ? destination[0] : 8 - destination[0];
-  const center = 4 - Math.abs(4 - destination[1]);
-  const danger = observedDanger(state, destination, cpuSide);
-  return (capturedShadow ? 420 : 0)
-    + (action.kind === 'move' && action.promote ? 210 : 0)
-    + forwardProgress * 8
-    + center * 5
-    - danger * PIECE_VALUE[movingName] * 0.28;
-}
-
 interface SearchContext {
   deadline: number;
   maxNodes: number;
   nodes: number;
   timedOut: boolean;
   perspective: Side;
+  profile: SearchProfile;
+  table: Map<string, TranspositionEntry>;
 }
 
-function orderedActions(state: GameState, context: SearchContext, depth: number, root = false): CpuAction[] {
-  const limit = root ? 72 : depth > 1 ? 30 : 48;
-  return getCpuActions(state)
-    .sort((a, b) => actionOrderScore(state, b, context.perspective) - actionOrderScore(state, a, context.perspective))
-    .slice(0, limit);
+interface SearchProfile {
+  maxDepth: number;
+  maxNodes: number;
+  rootLimit: number;
+  deepLimit: number;
+  shallowLimit: number;
+  quiescenceDepth: number;
+  advancedEvaluation: boolean;
+  useTranspositionTable: boolean;
 }
 
-function alphaBeta(state: GameState, depth: number, alpha: number, beta: number, context: SearchContext): number {
-  context.nodes += 1;
-  if (context.nodes >= context.maxNodes || Date.now() >= context.deadline) {
-    context.timedOut = true;
-    return evaluateState(state, context.perspective);
+interface TranspositionEntry {
+  depth: number;
+  value: number;
+  flag: 'exact' | 'lower' | 'upper';
+  bestActionKey?: string;
+}
+
+const GINJI_PROFILE: SearchProfile = {
+  maxDepth: 3,
+  maxNodes: 28_000,
+  rootLimit: 72,
+  deepLimit: 30,
+  shallowLimit: 48,
+  quiescenceDepth: 0,
+  advancedEvaluation: false,
+  useTranspositionTable: false,
+};
+
+const KAGEMARU_PROFILE: SearchProfile = {
+  maxDepth: 4,
+  maxNodes: 120_000,
+  rootLimit: 96,
+  deepLimit: 42,
+  shallowLimit: 64,
+  quiescenceDepth: 2,
+  advancedEvaluation: true,
+  useTranspositionTable: true,
+};
+
+function actionKey(action: CpuAction): string {
+  return action.kind === 'move'
+    ? `m${action.from[0]}${action.from[1]}${action.to[0]}${action.to[1]}${action.promote ? 1 : 0}`
+    : `d${action.name}${action.to[0]}${action.to[1]}`;
+}
+
+function stateKey(state: GameState): string {
+  const board = state.board
+    .map((row) => row.map((piece) => piece ? `${piece.side}${piece.name}` : '_').join(','))
+    .join('/');
+  const hands = HAND_NAMES
+    .map((name) => `${name}${state.hands[1][name]}:${state.hands[2][name]}`)
+    .join(',');
+  return `${state.turn}|${board}|${hands}`;
+}
+
+function advancedEvaluation(state: GameState, perspective: Side): number {
+  let score = evaluateState(state, perspective);
+  if (state.winner) return score;
+  const enemy = perspective === 1 ? 2 : 1;
+  if (isKingUnderImmediateThreat(state, perspective)) score -= 7_500;
+  if (isKingUnderImmediateThreat(state, enemy)) score += 7_500;
+
+  for (const side of [perspective, enemy] as const) {
+    const king = findKing(state, side);
+    if (!king) continue;
+    let defenders = 0;
+    let escapeSquares = 0;
+    for (const [rowDelta, columnDelta] of [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]] as Position[]) {
+      const row = king[0] + rowDelta;
+      const column = king[1] + columnDelta;
+      if (row < 0 || row > 8 || column < 0 || column > 8) continue;
+      const piece = state.board[row][column];
+      if (piece?.side === side) defenders += 1;
+      if (!piece || piece.side !== side) escapeSquares += 1;
+    }
+    const sign = side === perspective ? 1 : -1;
+    score += sign * (defenders * 24 + escapeSquares * 10);
   }
-  if (depth === 0 || state.winner) return evaluateState(state, context.perspective);
+  return score;
+}
 
-  const actions = orderedActions(state, context, depth);
-  if (actions.length === 0) return evaluateState(state, context.perspective);
+function evaluateForSearch(state: GameState, context: SearchContext): number {
+  return context.profile.advancedEvaluation
+    ? advancedEvaluation(state, context.perspective)
+    : evaluateState(state, context.perspective);
+}
+
+function orderedActions(
+  state: GameState,
+  context: SearchContext,
+  depth: number,
+  root = false,
+  preferredActionKey?: string,
+): CpuAction[] {
+  const limit = root
+    ? context.profile.rootLimit
+    : depth > 1
+      ? context.profile.deepLimit
+      : context.profile.shallowLimit;
+  const threatened = context.profile.advancedEvaluation && isKingUnderImmediateThreat(state, state.turn);
+  return getCpuActions(state)
+    .map((action) => {
+      let score = actionOrderScore(state, action, context.perspective);
+      if (actionKey(action) === preferredActionKey) score += 2_000_000;
+      if (threatened && !isKingUnderImmediateThreat(applyCpuAction(state, action), state.turn)) score += 1_000_000;
+      return { action, score };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(({ action }) => action);
+}
+
+function quiescence(
+  state: GameState,
+  remainingDepth: number,
+  alpha: number,
+  beta: number,
+  context: SearchContext,
+): number {
+  context.nodes += 1;
+  const standPat = evaluateForSearch(state, context);
+  if (
+    state.winner ||
+    remainingDepth === 0 ||
+    context.nodes >= context.maxNodes ||
+    Date.now() >= context.deadline
+  ) {
+    if (context.nodes >= context.maxNodes || Date.now() >= context.deadline) context.timedOut = true;
+    return standPat;
+  }
+
   const maximizing = state.turn === context.perspective;
-  let best = maximizing ? -Infinity : Infinity;
+  let best = standPat;
+  if (maximizing) alpha = Math.max(alpha, best);
+  else beta = Math.min(beta, best);
+  if (beta <= alpha) return best;
 
-  for (const action of actions) {
-    const value = alphaBeta(applyCpuAction(state, action), depth - 1, alpha, beta, context);
+  const inDanger = isKingUnderImmediateThreat(state, state.turn);
+  const tacticalActions = orderedActions(state, context, 0)
+    .filter((action) => inDanger || actionCapture(state, action) !== null || (action.kind === 'move' && action.promote))
+    .slice(0, inDanger ? 20 : 14);
+
+  for (const action of tacticalActions) {
+    const value = quiescence(applyCpuAction(state, action), remainingDepth - 1, alpha, beta, context);
     if (maximizing) {
       best = Math.max(best, value);
       alpha = Math.max(alpha, best);
@@ -218,7 +330,66 @@ function alphaBeta(state: GameState, depth: number, alpha: number, beta: number,
   return best;
 }
 
-function strongestDecision(state: GameState, cpuSide: Side, timeBudgetMs: number): CpuDecision {
+function alphaBeta(state: GameState, depth: number, alpha: number, beta: number, context: SearchContext): number {
+  context.nodes += 1;
+  if (context.nodes >= context.maxNodes || Date.now() >= context.deadline) {
+    context.timedOut = true;
+    return evaluateForSearch(state, context);
+  }
+  if (state.winner) return evaluateForSearch(state, context);
+  if (depth === 0) {
+    return context.profile.quiescenceDepth > 0
+      ? quiescence(state, context.profile.quiescenceDepth, alpha, beta, context)
+      : evaluateForSearch(state, context);
+  }
+
+  const alphaOriginal = alpha;
+  const betaOriginal = beta;
+  const key = context.profile.useTranspositionTable ? stateKey(state) : '';
+  const cached = key ? context.table.get(key) : undefined;
+  if (cached && cached.depth >= depth) {
+    if (cached.flag === 'exact') return cached.value;
+    if (cached.flag === 'lower') alpha = Math.max(alpha, cached.value);
+    if (cached.flag === 'upper') beta = Math.min(beta, cached.value);
+    if (alpha >= beta) return cached.value;
+  }
+
+  const actions = orderedActions(state, context, depth, false, cached?.bestActionKey);
+  if (actions.length === 0) return evaluateForSearch(state, context);
+  const maximizing = state.turn === context.perspective;
+  let best = maximizing ? -Infinity : Infinity;
+  let bestActionKey: string | undefined;
+
+  for (const action of actions) {
+    const value = alphaBeta(applyCpuAction(state, action), depth - 1, alpha, beta, context);
+    if (maximizing) {
+      if (value > best) {
+        best = value;
+        bestActionKey = actionKey(action);
+      }
+      alpha = Math.max(alpha, best);
+    } else {
+      if (value < best) {
+        best = value;
+        bestActionKey = actionKey(action);
+      }
+      beta = Math.min(beta, best);
+    }
+    if (beta <= alpha || context.timedOut) break;
+  }
+  if (key && !context.timedOut) {
+    const flag = best <= alphaOriginal ? 'upper' : best >= betaOriginal ? 'lower' : 'exact';
+    context.table.set(key, { depth, value: best, flag, bestActionKey });
+  }
+  return best;
+}
+
+function searchDecision(
+  state: GameState,
+  cpuSide: Side,
+  timeBudgetMs: number,
+  profile: SearchProfile,
+): CpuDecision {
   const initialActions = getCpuActions(state, cpuSide);
   if (initialActions.length === 0) return { action: null, depth: 0, nodes: 0 };
 
@@ -227,17 +398,20 @@ function strongestDecision(state: GameState, cpuSide: Side, timeBudgetMs: number
 
   const context: SearchContext = {
     deadline: Date.now() + timeBudgetMs,
-    maxNodes: 28_000,
+    maxNodes: profile.maxNodes,
     nodes: 0,
     timedOut: false,
     perspective: cpuSide,
+    profile,
+    table: new Map(),
   };
   let chosen = initialActions[0];
   let completedDepth = 0;
+  let preferredActionKey: string | undefined;
 
-  for (let depth = 1; depth <= 3; depth += 1) {
+  for (let depth = 1; depth <= profile.maxDepth; depth += 1) {
     context.timedOut = false;
-    const actions = orderedActions(state, context, depth, true);
+    const actions = orderedActions(state, context, depth, true, preferredActionKey);
     let roundBest = chosen;
     let roundScore = -Infinity;
     for (const action of actions) {
@@ -250,6 +424,7 @@ function strongestDecision(state: GameState, cpuSide: Side, timeBudgetMs: number
     }
     if (context.timedOut) break;
     chosen = roundBest;
+    preferredActionKey = actionKey(chosen);
     completedDepth = depth;
   }
 
@@ -261,24 +436,24 @@ export function chooseCpuAction(
   level: CpuLevel,
   cpuSide: Side = state.turn,
   random: () => number = Math.random,
-  timeBudgetMs = 360,
+  timeBudgetMs?: number,
 ): CpuDecision {
   const actions = getCpuActions(state, cpuSide);
   if (actions.length === 0) return { action: null, depth: 0, nodes: 0 };
 
   if (level === 1) {
-    const captures = actions.filter((action) => actionCapture(state, action) !== null);
-    return { action: randomItem(captures.length > 0 ? captures : actions, random), depth: 0, nodes: actions.length };
+    let candidates = actions;
+    if (isKingUnderImmediateThreat(state, cpuSide)) {
+      const defensiveActions = safeKingResponses(state, actions, cpuSide);
+      if (defensiveActions.length > 0 && random() < 0.9) candidates = defensiveActions;
+    }
+    const captures = candidates.filter((action) => actionCapture(state, action) !== null);
+    return { action: randomItem(captures.length > 0 ? captures : candidates, random), depth: 0, nodes: actions.length };
   }
 
   if (level === 2) {
-    const scored = actions
-      .map((action) => ({ action, score: mediumScore(state, action, cpuSide) }))
-      .sort((a, b) => b.score - a.score);
-    const bestScore = scored[0].score;
-    const candidates = scored.filter(({ score }) => score >= bestScore - 24).slice(0, 4);
-    return { action: randomItem(candidates, random)?.action ?? scored[0].action, depth: 1, nodes: actions.length };
+    return searchDecision(state, cpuSide, timeBudgetMs ?? 360, GINJI_PROFILE);
   }
 
-  return strongestDecision(state, cpuSide, timeBudgetMs);
+  return searchDecision(state, cpuSide, timeBudgetMs ?? 1_500, KAGEMARU_PROFILE);
 }

@@ -34,6 +34,23 @@ test('初級CPUは取れる影があれば捕獲を選ぶ', () => {
   assert.deepEqual(decision.action?.to, [4, 6]);
 });
 
+test('初級CPUは王を次に取られる局面で高確率の防御を選ぶ', () => {
+  const game = cpuGame(
+    [4, 4, { id: 1, name: '王', side: 1 }],
+    [4, 0, { id: 2, name: '飛', side: 2 }],
+    [0, 8, { id: 3, name: '王', side: 2 }],
+  );
+  const decision = chooseCpuAction(game, 1, 1, () => 0);
+  assert.ok(decision.action);
+
+  const next = applyCpuAction(game, decision.action!);
+  const cpuKing = next.board.flatMap((row, rowIndex) => row.map((piece, columnIndex) => (
+    piece?.side === 1 && piece.name === '王' ? [rowIndex, columnIndex] as const : null
+  ))).find(Boolean);
+  assert.ok(cpuKing);
+  assert.equal(getCpuActions({ ...next, turn: 2 }, 2).some((action) => action.kind === 'move' && action.to[0] === cpuKing[0] && action.to[1] === cpuKing[1]), false);
+});
+
 test('最強CPUは完全情報から王を捕獲する手を逃さない', () => {
   const game = cpuGame(
     [3, 4, { id: 1, name: '歩', side: 1 }],
@@ -43,4 +60,14 @@ test('最強CPUは完全情報から王を捕獲する手を逃さない', () =>
   assert.ok(decision.action);
   const next = applyCpuAction(game, decision.action!);
   assert.equal(next.winner, 1);
+});
+
+test('金一も旧最強AIと同じ探索で王を捕獲する手を逃さない', () => {
+  const game = cpuGame(
+    [3, 4, { id: 1, name: '歩', side: 1 }],
+    [4, 4, { id: 2, name: '王', side: 2 }],
+  );
+  const decision = chooseCpuAction(game, 2, 1, () => 0, 50);
+  assert.ok(decision.action);
+  assert.equal(applyCpuAction(game, decision.action!).winner, 1);
 });

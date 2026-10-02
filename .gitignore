@@ -1,5 +1,5 @@
 # dependencies
-/node_modules
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -10,6 +10,9 @@
 
 # testing
 /coverage
+/playwright-report/
+/test-results/
+/.npm-cache/
 
 # next.js
 /.next/
@@ -28,11 +31,15 @@ yarn-error.log*
 
 # local environment
 .env*
+!.env.example
 
 # deployment and generated files
 .vercel
 next-env.d.ts
 /dist/
+/functions/lib/
 /.wrangler/
+/.firebase-cli-config/
+/.cloudflare-cli-config/
 /outputs/
 /work/

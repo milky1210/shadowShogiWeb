@@ -7,10 +7,18 @@ import {
   createInitialGame,
   getDropTargets,
   getLegalMoves,
+  randomSide,
   seededRandom,
   type GameState,
   type Piece,
 } from './shadow-shogi.ts';
+
+test('先後の抽選境界は50%ずつ', () => {
+  assert.equal(randomSide(() => 0), 1);
+  assert.equal(randomSide(() => 0.499999), 1);
+  assert.equal(randomSide(() => 0.5), 2);
+  assert.equal(randomSide(() => 0.999999), 2);
+});
 
 test('Swift版と同じ初期配置制約をすべてのseedで満たす', () => {
   for (let seed = 1; seed <= 100; seed += 1) {

@@ -1,0 +1,66 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "config": {
+      "onlineEnabled": {
+        ".read": true,
+        ".write": false,
+        ".validate": "newData.isBoolean()"
+      },
+      "$other": { ".validate": false }
+    },
+    "rooms": {
+      ".indexOn": ["meta/updatedAt"],
+      "$room": {
+        ".read": "auth != null && $room.matches(/^[2-9A-HJ-NP-Z]{8}$/)",
+        ".write": "auth != null && $room.matches(/^[2-9A-HJ-NP-Z]{8}$/) && root.child('config/onlineEnabled').val() != false && newData.exists() && newData.child('version').val() === 3 && ((!data.exists() && newData.child('meta/hostUid').val() === auth.uid && !newData.child('meta/guestUid').exists() && newData.child('meta/status').val() === 'waiting' && newData.child('meta/revision').val() === 0 && !newData.child('meta/winner').exists() && !newData.child('meta/lastMoveKey').exists() && !newData.child('moves').exists() && newData.child('meta/updatedAt').val() === newData.child('meta/createdAt').val() && newData.child('meta/createdAt').val() <= now + 60000 && newData.child('meta/createdAt').val() >= now - 300000) || (data.child('version').val() === 3 && !data.child('meta/guestUid').exists() && newData.child('meta/guestUid').val() === auth.uid && newData.child('meta/hostUid').val() === data.child('meta/hostUid').val() && newData.child('meta/hostSide').val() === data.child('meta/hostSide').val() && newData.child('meta/guestSide').val() === data.child('meta/guestSide').val() && newData.child('meta/createdAt').val() === data.child('meta/createdAt').val() && newData.child('meta/revision').val() === data.child('meta/revision').val() && newData.child('meta/turn').val() === data.child('meta/turn').val() && newData.child('meta/winner').val() === data.child('meta/winner').val() && newData.child('meta/lastMoveKey').val() === data.child('meta/lastMoveKey').val() && newData.child('meta/status').val() === 'playing' && newData.child('initialGameJson').val() === data.child('initialGameJson').val() && newData.child('moves').val() === data.child('moves').val() && newData.child('meta/updatedAt').val() >= data.child('meta/updatedAt').val() && newData.child('meta/updatedAt').val() <= now + 60000 && newData.child('meta/updatedAt').val() >= now - 300000) || (data.child('version').val() === 3 && data.child('meta/guestUid').exists() && ((data.child('meta/hostUid').val() === auth.uid && data.child('meta/hostSide').val() === data.child('meta/turn').val()) || (data.child('meta/guestUid').val() === auth.uid && data.child('meta/guestSide').val() === data.child('meta/turn').val())) && newData.child('meta/hostUid').val() === data.child('meta/hostUid').val() && newData.child('meta/guestUid').val() === data.child('meta/guestUid').val() && newData.child('meta/hostSide').val() === data.child('meta/hostSide').val() && newData.child('meta/guestSide').val() === data.child('meta/guestSide').val() && newData.child('meta/createdAt').val() === data.child('meta/createdAt').val() && newData.child('initialGameJson').val() === data.child('initialGameJson').val() && newData.child('meta/revision').val() === data.child('meta/revision').val() + 1 && newData.child('meta/turn').val() !== data.child('meta/turn').val() && newData.child('meta/lastMoveKey').isString() && newData.child('meta/lastMoveKey').val() !== data.child('meta/lastMoveKey').val() && newData.child('moves').child(newData.child('meta/lastMoveKey').val()).exists() && ((newData.child('meta/status').val() === 'playing' && !newData.child('meta/winner').exists()) || (newData.child('meta/status').val() === 'finished' && (newData.child('meta/winner').val() === 1 || newData.child('meta/winner').val() === 2))) && newData.child('meta/updatedAt').val() >= data.child('meta/updatedAt').val() && newData.child('meta/updatedAt').val() <= now + 60000 && newData.child('meta/updatedAt').val() >= now - 300000))",
+        "version": { ".validate": "newData.val() === 3" },
+        "initialGameJson": {
+          ".validate": "newData.isString() && newData.val().length > 100 && newData.val().length <= 262144"
+        },
+        "meta": {
+          ".validate": "newData.hasChildren(['status', 'hostUid', 'hostSide', 'guestSide', 'createdAt', 'updatedAt', 'revision', 'turn'])",
+          "status": { ".validate": "newData.val() === 'waiting' || newData.val() === 'playing' || newData.val() === 'finished'" },
+          "hostUid": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 128" },
+          "guestUid": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length > 0 && newData.val().length <= 128 && newData.val() !== newData.parent().child('hostUid').val())" },
+          "hostSide": { ".validate": "newData.val() === 1 || newData.val() === 2" },
+          "guestSide": { ".validate": "(newData.val() === 1 || newData.val() === 2) && newData.val() !== newData.parent().child('hostSide').val()" },
+          "createdAt": { ".validate": "newData.isNumber()" },
+          "updatedAt": { ".validate": "newData.isNumber()" },
+          "revision": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "turn": { ".validate": "newData.val() === 1 || newData.val() === 2" },
+          "winner": { ".validate": "!newData.exists() || newData.val() === 1 || newData.val() === 2" },
+          "lastMoveKey": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length > 0 && newData.val().length <= 128)" },
+          "$other": { ".validate": false }
+        },
+        "moves": {
+          ".validate": "newData.parent().child('version').val() === 3",
+          ".indexOn": ["revision"],
+          "$move": {
+            ".validate": "data.exists() ? newData.val() === data.val() : ($move === newData.parent().parent().child('meta/lastMoveKey').val() && newData.hasChildren(['to', 'side', 'pieceId', 'pieceName', 'promoted', 'dropped', 'revision', 'uid', 'createdAt']) && newData.child('uid').val() === auth.uid && newData.child('side').val() === root.child('rooms').child($room).child('meta/turn').val() && newData.child('revision').val() === root.child('rooms').child($room).child('meta/revision').val() + 1 && newData.child('createdAt').isNumber() && newData.child('createdAt').val() <= now + 60000 && newData.child('createdAt').val() >= now - 300000)",
+            "from": {
+              ".validate": "!newData.exists() || (newData.hasChildren(['0', '1']) && newData.child('0').isNumber() && newData.child('0').val() >= 0 && newData.child('0').val() <= 8 && newData.child('1').isNumber() && newData.child('1').val() >= 0 && newData.child('1').val() <= 8)",
+              "$other": { ".validate": false }
+            },
+            "to": {
+              ".validate": "newData.hasChildren(['0', '1']) && newData.child('0').isNumber() && newData.child('0').val() >= 0 && newData.child('0').val() <= 8 && newData.child('1').isNumber() && newData.child('1').val() >= 0 && newData.child('1').val() <= 8",
+              "$other": { ".validate": false }
+            },
+            "side": { ".validate": "newData.val() === 1 || newData.val() === 2" },
+            "pieceId": { ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= 10000" },
+            "pieceName": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 16" },
+            "captured": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length > 0 && newData.val().length <= 16)" },
+            "promoted": { ".validate": "newData.isBoolean()" },
+            "dropped": { ".validate": "newData.isBoolean()" },
+            "revision": { ".validate": "newData.isNumber() && newData.val() > 0" },
+            "uid": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 128" },
+            "createdAt": { ".validate": "newData.isNumber()" },
+            "$other": { ".validate": false }
+          }
+        },
+        "$other": { ".validate": false }
+      }
+    }
+  }
+}
