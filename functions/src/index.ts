@@ -21,10 +21,7 @@ export const cleanupExpiredRooms = onSchedule(
     const roomsReference = getDatabase().ref('rooms');
     const [legacyRooms, incrementalRooms] = await Promise.all([
       roomsReference.orderByChild('updatedAt').endAt(cutoff).once('value'),
-      roomsReference
-        .orderByChild('meta/updatedAt')
-        .endAt(cutoff)
-        .once('value'),
+      roomsReference.orderByChild('meta/updatedAt').endAt(cutoff).once('value'),
     ]);
 
     if (!legacyRooms.exists() && !incrementalRooms.exists()) {
@@ -33,10 +30,18 @@ export const cleanupExpiredRooms = onSchedule(
     }
 
     const updates: Record<string, null> = {};
-    for (const snapshot of [legacyRooms, incrementalRooms])
-      snapshot.forEach((room) => {
+    legacyRooms.forEach((room) => {
+      if (room.child('version').val() !== 3) updates[room.key!] = null;
+    });
+    incrementalRooms.forEach((room) => {
+      if (room.child('version').val() === 3) {
         updates[room.key!] = null;
-      });
+      }
+    });
+    if (Object.keys(updates).length === 0) {
+      logger.info('No expired rooms found.');
+      return;
+    }
     await roomsReference.update(updates);
     logger.info('Expired rooms removed.', {
       count: Object.keys(updates).length,

@@ -408,11 +408,12 @@ export function GameApp() {
   const [onlineAccessStatus, setOnlineAccessStatus] = useState<
     'playing' | 'finished' | null
   >(null);
-  const [joinCode, setJoinCode] = useState('');
+  const [joinCodeInput, setJoinCodeInput] = useState('');
   const [inviteFeedback, setInviteFeedback] = useState('');
   const autoJoinAttempted = useRef(false);
   const localGuesses = useRef<GameState['guesses']>({});
   const reviewing = reviewIndex !== null;
+  const joinCode = normalizeRoomCode(joinCodeInput);
   const cpuSide = otherSide(humanSide);
   const shownGame = reviewing
     ? (timeline[reviewIndex] ?? game ?? PREVIEW_GAME)
@@ -566,7 +567,7 @@ export function GameApp() {
   const joinOnlineMatch = useCallback(
     async (roomCodeValue: string) => {
       const roomCode = normalizeRoomCode(roomCodeValue);
-      setJoinCode(roomCode);
+      setJoinCodeInput(roomCode);
       setOnlineBusy(true);
       setOnlineError('');
       try {
@@ -802,7 +803,7 @@ export function GameApp() {
     setOnlineBusy(false);
     setOnlineError('');
     setOnlineAccessStatus(null);
-    setJoinCode('');
+    setJoinCodeInput('');
     setInviteFeedback('');
     localGuesses.current = {};
     setMatchSelection('local');
@@ -1325,14 +1326,16 @@ export function GameApp() {
                 <div>
                   <Input
                     id="online-room-code"
-                    value={joinCode}
-                    maxLength={8}
+                    value={joinCodeInput}
+                    maxLength={32}
                     autoComplete="off"
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
                     inputMode="text"
                     placeholder="8文字の部屋番号"
-                    onChange={(event) =>
-                      setJoinCode(normalizeRoomCode(event.target.value))
-                    }
+                    onChange={(event) => setJoinCodeInput(event.target.value)}
+                    onBlur={() => setJoinCodeInput(joinCode)}
                   />
                   <Button
                     type="submit"
